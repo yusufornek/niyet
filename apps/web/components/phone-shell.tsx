@@ -34,10 +34,10 @@ export function PhoneShell({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen items-start justify-center bg-[hsl(var(--canvas-parchment))] py-0 sm:py-8">
+    <div className="flex h-[100dvh] items-stretch justify-center bg-[hsl(var(--canvas-parchment))] sm:h-auto sm:min-h-screen sm:items-start sm:py-8">
       <div
         className={cn(
-          'relative flex w-full flex-col overflow-hidden sm:h-[844px] sm:w-[390px] sm:rounded-[44px] sm:border sm:border-black/10',
+          'relative flex h-full w-full flex-col overflow-hidden sm:h-[844px] sm:w-[390px] sm:rounded-[44px] sm:border sm:border-black/10',
           dark
             ? 'bg-[hsl(var(--tile-1))] text-[hsl(var(--body-on-dark))]'
             : 'text-foreground bg-[hsl(var(--canvas))]',
