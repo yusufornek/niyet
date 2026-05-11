@@ -9,22 +9,34 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
-import Link from 'next/link';
 import type { Route } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
 import { ScoreCard } from '@/components/score-card';
-import { fmt, useApp } from '@/lib/stores/use-app';
+import { useDashboard, useFutureScore, useGoals, useMe } from '@/lib/graphql/queries';
+import { useApp } from '@/lib/stores/use-app';
+import { formatTRY } from '@/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const acceptedSavings = useApp((s) => s.acceptedSavings);
-  const goals = useApp((s) => s.goals);
   const paused = useApp((s) => s.paused);
-  const rulesLen = useApp((s) => s.rules.length);
-  const goal = goals[0]!;
+  const acceptedSavings = useApp((s) => s.acceptedSavings);
+
+  const { data: me } = useMe();
+  const { data: dash, isLoading: dashLoading } = useDashboard();
+  const { data: goalsData } = useGoals();
+  const { data: scoreData } = useFutureScore();
+
+  const userName = me?.me?.name?.split(' ')[0] ?? '';
+  const goal = goalsData?.goals[0];
+  const dashboard = dash?.dashboard;
+  const score = scoreData?.futureScore;
+  const acceptedShown =
+    acceptedSavings > 0 ? acceptedSavings : Math.round((dashboard?.weeklySaved ?? 0) * 4);
+
   return (
     <PhoneShell
       rightSlot={
@@ -34,8 +46,12 @@ export default function DashboardPage() {
       }
     >
       <div className="pb-4 pt-2">
-        <div className="ny-eyebrow">Merhaba Ayşe</div>
-        <h1 className="ny-h1 mt-1">Bu ay 2.450 ₺ kurtarabilirsin.</h1>
+        <div className="ny-eyebrow">Merhaba {userName || 'Niyetli'}</div>
+        <h1 className="ny-h1 mt-1">
+          {dashLoading
+            ? 'Yükleniyor…'
+            : `Bu ay ${formatTRY(dashboard?.totalOpportunityLast30d ?? 0)} kurtarabilirsin.`}
+        </h1>
       </div>
 
       {paused && (
@@ -49,7 +65,7 @@ export default function DashboardPage() {
       )}
 
       <ScoreCard
-        score={68}
+        score={score?.score ?? 0}
         delta={4}
         title="İyi gidiyorsun"
         subtitle="Üzerine gel — genel istatistiklerini gör."
@@ -58,52 +74,66 @@ export default function DashboardPage() {
         stats={[
           {
             label: 'Kabul edilen tasarruf',
-            value: fmt(acceptedSavings || 1850),
+            value: formatTRY(acceptedShown),
             foot: 'son 30 gün',
           },
-          { label: 'Aktif kural', value: `${rulesLen}`, foot: 'otomatik katkı' },
+          {
+            label: 'Aktif kural',
+            value: `${dashboard?.activeRulesCount ?? 0}`,
+            foot: 'otomatik katkı',
+          },
           {
             label: 'Hedef ilerleme',
-            value: `${Math.round((goal.current / goal.target) * 100)}%`,
-            foot: goal.name,
+            value: goal ? `${Math.round((goal.current / goal.currentPrice) * 100)}%` : '—',
+            foot: goal?.name ?? 'hedef yok',
           },
-          { label: 'Bu ay fırsat', value: '2.450 ₺', foot: 'azaltılabilir' },
+          {
+            label: 'Bu ay fırsat',
+            value: formatTRY(dashboard?.totalOpportunityLast30d ?? 0),
+            foot: 'azaltılabilir',
+          },
         ]}
       />
 
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Link href="/radar" className="ny-card text-left">
           <div className="ny-eyebrow">Fırsat</div>
-          <div className="mt-1 text-2xl font-semibold">2.450 ₺</div>
+          <div className="mt-1 text-2xl font-semibold">
+            {formatTRY(dashboard?.totalOpportunityLast30d ?? 0)}
+          </div>
           <div className="mt-1 text-xs opacity-60">azaltılabilir harcama</div>
         </Link>
         <Link href="/rule" className="ny-card text-left">
           <div className="ny-eyebrow">Önerilen katkı</div>
-          <div className="text-primary mt-1 text-2xl font-semibold">750 ₺</div>
+          <div className="text-primary mt-1 text-2xl font-semibold">
+            {formatTRY(Math.round((dashboard?.totalOpportunityLast30d ?? 0) * 0.3))}
+          </div>
           <div className="mt-1 text-xs opacity-60">bu ay</div>
         </Link>
       </div>
 
-      <Link href="/goals" className="ny-card mb-3 block w-full text-left">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="ny-eyebrow">Aktif hedef</div>
-            <div className="mt-1 font-semibold">{goal.name}</div>
+      {goal && (
+        <Link href="/goals" className="ny-card mb-3 block w-full text-left">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="ny-eyebrow">Aktif hedef</div>
+              <div className="mt-1 font-semibold">{goal.name}</div>
+            </div>
+            <div className="text-sm opacity-60">
+              {Math.round((goal.current / goal.currentPrice) * 100)}%
+            </div>
           </div>
-          <div className="text-sm opacity-60">
-            {Math.round((goal.current / goal.target) * 100)}%
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[hsl(var(--divider-soft))]">
+            <div
+              className="bg-primary h-full"
+              style={{ width: `${(goal.current / goal.currentPrice) * 100}%` }}
+            />
           </div>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[hsl(var(--divider-soft))]">
-          <div
-            className="bg-primary h-full"
-            style={{ width: `${(goal.current / goal.target) * 100}%` }}
-          />
-        </div>
-        <div className="mt-2 text-xs opacity-60">
-          {fmt(goal.current)} / {fmt(goal.target)}
-        </div>
-      </Link>
+          <div className="mt-2 text-xs opacity-60">
+            {formatTRY(goal.current)} / {formatTRY(goal.currentPrice)}
+          </div>
+        </Link>
+      )}
 
       <div className="ny-eyebrow mb-2 mt-5">Hızlı erişim</div>
       <div className="mb-3 grid grid-cols-3 gap-3">
@@ -116,20 +146,16 @@ export default function DashboardPage() {
       </div>
 
       <div className="ny-card mb-3">
-        <div className="ny-eyebrow">Yaklaşan</div>
+        <div className="ny-eyebrow">Son 30 gün</div>
         <div className="mt-2 text-sm">
-          28 Mayıs · Maaş günü katkısı <span className="text-primary font-semibold">1.000 ₺</span>
+          {dashboard?.txCountLast30d ?? 0} işlem · Toplam{' '}
+          <span className="font-semibold">{formatTRY(dashboard?.totalSpentLast30d ?? 0)}</span>
         </div>
       </div>
 
       <Link href="/demo-result" className="ny-pill-ghost block w-full text-center">
         Demo özetini gör
       </Link>
-      {acceptedSavings > 0 && (
-        <p className="text-primary mt-3 text-center text-xs">
-          Bu oturumda {fmt(acceptedSavings)} katkıya dönüştürdün ✨
-        </p>
-      )}
     </PhoneShell>
   );
 }

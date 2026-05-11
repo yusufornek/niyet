@@ -1,31 +1,51 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { useMe } from '@/lib/graphql/queries';
+import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/stores/use-app';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { data: meData } = useMe();
   const connected = useApp((s) => s.connected);
   const setConnected = useApp((s) => s.setConnected);
   const paused = useApp((s) => s.paused);
   const notificationsEnabled = useApp((s) => s.notificationsEnabled);
   const toggleNotifications = useApp((s) => s.toggleNotifications);
   const [confirm, setConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const me = meData?.me;
+  const firstLetter = me?.name?.[0]?.toUpperCase() ?? 'N';
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    toast.success('Çıkış yapıldı');
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
     <PhoneShell title="Ayarlar" back>
       <div className="ny-card mb-3">
         <div className="ny-eyebrow mb-3">Profil</div>
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--canvas-parchment))] font-semibold">
-            A
+            {firstLetter}
           </div>
           <div>
-            <div className="font-semibold">Ayşe</div>
-            <div className="text-xs opacity-60">22 · Üniversite öğrencisi</div>
+            <div className="font-semibold">{me?.name ?? '—'}</div>
+            <div className="text-xs opacity-60">
+              {me?.age ? `${me.age} yaşında` : ''} · {me?.email ?? ''}
+            </div>
           </div>
         </div>
       </div>
@@ -49,6 +69,14 @@ export default function SettingsPage() {
       <div className="ny-eyebrow mb-2 mt-5">Yasal</div>
       <Row label="Gizlilik" value="" onClick={() => {}} />
       <Row label="Kullanım koşulları" value="" onClick={() => {}} />
+
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="ny-card text-destructive mt-5 flex w-full items-center justify-center gap-2 text-sm font-semibold disabled:opacity-50"
+      >
+        <LogOut size={16} /> {loggingOut ? 'Çıkış yapılıyor…' : 'Çıkış yap'}
+      </button>
 
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">

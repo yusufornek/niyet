@@ -63,13 +63,13 @@ export default function OnboardingPage() {
           </div>
           <button
             className="ny-pill w-full"
-            onClick={() => (last ? router.push('/consent') : setI(i + 1))}
+            onClick={() => (last ? router.push('/signup') : setI(i + 1))}
           >
-            {last ? 'Başla' : 'Devam'}
+            {last ? 'Hesap oluştur' : 'Devam'}
           </button>
           <button
             className="ny-pill-ghost w-full border-white/40 text-white"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/login')}
           >
             Demo modunda dene
           </button>

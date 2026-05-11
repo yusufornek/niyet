@@ -1,98 +1,64 @@
 'use client';
 
-import { Plus, Users } from 'lucide-react';
-import { useState } from 'react';
+import { Users } from 'lucide-react';
 
 import { PhoneShell } from '@/components/phone-shell';
-import { fmt, useApp } from '@/lib/stores/use-app';
+import { useCircles } from '@/lib/graphql/queries';
+import { formatTRY } from '@/lib/utils';
 
 export default function CirclesPage() {
-  const circles = useApp((s) => s.circles);
-  const addCircle = useApp((s) => s.addCircle);
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
-  const [target, setTarget] = useState(50000);
+  const { data, isLoading } = useCircles();
+  const circles = data?.circles ?? [];
+
   return (
-    <PhoneShell
-      title="Birikim Çemberleri"
-      back
-      rightSlot={
-        <button onClick={() => setCreating(true)} className="text-primary" aria-label="Yeni çember">
-          <Plus size={20} />
-        </button>
-      }
-    >
+    <PhoneShell title="Birikim Çemberleri" back>
       <p className="ny-tagline mb-4">Ailen veya topluluğunla ortak hedef.</p>
 
-      <div className="space-y-4">
-        {circles.map((c) => {
-          const total = c.members.reduce((s, m) => s + m.a, 0);
-          const pct = (total / c.target) * 100;
-          return (
-            <div key={c.id} className="ny-tile-dark">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/60">
-                <Users size={14} /> {c.name}
-              </div>
-              <div className="ny-tight mt-2 text-3xl font-semibold">{fmt(total)}</div>
-              <div className="mt-1 text-sm text-white/60">Hedef: {fmt(c.target)}</div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full bg-[hsl(var(--primary-on-dark))]"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="mt-3 space-y-2">
-                {c.members.map((m) => (
-                  <div key={m.n} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs">
-                        {m.n[0]}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="ny-tile-dark h-40 animate-pulse" />
+          ))}
+        </div>
+      ) : circles.length === 0 ? (
+        <p className="ny-tagline">Henüz çember yok.</p>
+      ) : (
+        <div className="space-y-4">
+          {circles.map((c) => {
+            const total = c.members.reduce((s, m) => s + m.contribution, 0);
+            const pct = c.target > 0 ? (total / c.target) * 100 : 0;
+            return (
+              <div key={c.id} className="ny-tile-dark">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/60">
+                  <Users size={14} /> {c.name}
+                </div>
+                <div className="ny-tight mt-2 text-3xl font-semibold">{formatTRY(total)}</div>
+                <div className="mt-1 text-sm text-white/60">Hedef: {formatTRY(c.target)}</div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full bg-[hsl(var(--primary-on-dark))]"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {c.members.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs">
+                          {m.user.name[0]}
+                        </div>
+                        <span>{m.user.name}</span>
                       </div>
-                      <span>{m.n}</span>
+                      <span className="text-[hsl(var(--primary-on-dark))]">
+                        {formatTRY(m.contribution)}
+                      </span>
                     </div>
-                    <span className="text-[hsl(var(--primary-on-dark))]">{fmt(m.a)}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <button className="ny-pill-sm mt-4">Davet et</button>
               </div>
-              <button className="ny-pill-sm mt-4">Davet et</button>
-            </div>
-          );
-        })}
-      </div>
-
-      {creating && (
-        <div className="ny-card mt-5">
-          <div className="ny-eyebrow mb-3">Yeni çember</div>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Çember adı (ör. Tatil 2027)"
-            className="mb-3 w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
-          />
-          <input
-            type="number"
-            value={target}
-            onChange={(e) => setTarget(+e.target.value)}
-            placeholder="Hedef tutar"
-            className="mb-3 w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (name) {
-                  addCircle({ name, target });
-                  setName('');
-                  setCreating(false);
-                }
-              }}
-              className="ny-pill flex-1"
-            >
-              Oluştur
-            </button>
-            <button onClick={() => setCreating(false)} className="ny-pill-ghost flex-1">
-              İptal
-            </button>
-          </div>
+            );
+          })}
         </div>
       )}
     </PhoneShell>
