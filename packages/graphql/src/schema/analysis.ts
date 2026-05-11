@@ -1,7 +1,11 @@
 /**
- * AnalysisRun + TransactionAnalysis tipleri.
- * runAnalysis mutation Faz 5'te (Gemini pipeline) doldurulur — şimdilik stub.
+ * AnalysisRun + TransactionAnalysis tipleri + runAnalysis mutation.
+ *
+ * runAnalysis: Spending Analyzer Agent'i tetikler — son 90 gün tx'leri Gemini'ye
+ * yollar, function call sonuçlarını DB'ye yazar. Cache: 1 saat.
  */
+import { persistAnalysisResult, runSpendingAnalysis } from '@niyet/ai';
+
 import { builder } from '../builder';
 import { SpendingCategoryRef } from './enums';
 
@@ -58,33 +62,72 @@ builder.queryField('analysisHistory', (t) =>
   }),
 );
 
-// runAnalysis stub — Faz 5'te Gemini ile dolacak
+// Cache penceresi: aynı user 1 saat içinde tekrar tetiklerse son run dönülür
+const CACHE_WINDOW_MS = 60 * 60 * 1000;
+
 builder.mutationField('runAnalysis', (t) =>
   t.prismaField({
     type: 'AnalysisRun',
     authScopes: { authenticated: true },
-    description: "Gemini analizi tetikle. Faz 5'te tam implementasyon.",
-    resolve: async (query, _root, _args, ctx) => {
-      // STUB: gerçek Gemini call yok, sahte bir AnalysisRun kaydı oluşturuyor
-      const txs = await ctx.prisma.transaction.findMany({
-        where: { userId: ctx.userId! },
-        select: { id: true, opportunity: true },
-      });
-      const totalOpp = txs.reduce(
-        (s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0),
-        0,
-      );
-      return ctx.prisma.analysisRun.create({
-        ...query,
-        data: {
-          userId: ctx.userId!,
-          geminiModel: 'stub-faz-5-pending',
-          request: { note: "Gerçek Gemini entegrasyonu Faz 5'te eklenecek" },
-          response: { note: 'stub' },
-          durationMs: 0,
-          totalTransactions: txs.length,
-          totalOpportunity: Math.round(totalOpp),
+    description:
+      'Spending Analyzer Agent (Pattern A) — Gemini Function Calling ile son 90 gün analizi. Cache: 1 saat.',
+    args: {
+      forceRefresh: t.arg.boolean({ defaultValue: false }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      const userId = ctx.userId!;
+
+      // 1. Cache kontrolü
+      if (!args.forceRefresh) {
+        const since = new Date(Date.now() - CACHE_WINDOW_MS);
+        const cached = await ctx.prisma.analysisRun.findFirst({
+          ...query,
+          where: { userId, triggeredAt: { gte: since }, error: null },
+          orderBy: { triggeredAt: 'desc' },
+        });
+        if (cached) return cached;
+      }
+
+      // 2. Son 90 gün tx'leri
+      const since90 = new Date();
+      since90.setDate(since90.getDate() - 90);
+      const transactions = await ctx.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: since90 } },
+        select: {
+          id: true,
+          amount: true,
+          merchant: true,
+          occurredAt: true,
+          category: true,
+          description: true,
         },
+        orderBy: { occurredAt: 'desc' },
+        take: 300,
+      });
+
+      // 3. Agent pipeline
+      const result = await runSpendingAnalysis({ userId, transactions });
+
+      // 4. DB persist
+      const run = await persistAnalysisResult(userId, result);
+
+      // 5. Notification ekle (Realtime için Faz 6'da channel'a broadcast eklenecek)
+      await ctx.prisma.notification.create({
+        data: {
+          userId,
+          type: 'ANALYSIS_COMPLETE',
+          title: result.stubMode ? 'Analiz tamamlandı (demo)' : 'AI analizi tamamlandı',
+          body: result.stubMode
+            ? 'Gemini API key tanımlı değil; demo modunda çalışıldı.'
+            : `${result.reducibleFlags.length} azaltılabilir harcama tespit edildi. Toplam fırsat: ${Math.round(result.reducibleFlags.reduce((s, f) => s + f.reducible_amount, 0))} ₺`,
+          payload: { runId: run.id, stubMode: result.stubMode ?? false },
+        },
+      });
+
+      // 6. Pothos query include'ları ile yeniden çek
+      return ctx.prisma.analysisRun.findUniqueOrThrow({
+        ...query,
+        where: { id: run.id },
       });
     },
   }),

@@ -15,7 +15,13 @@
     "lint": "echo 'ai: lint (placeholder)'",
     "type-check": "tsc --noEmit",
     "test": "echo 'ai: test (placeholder)'",
-    "eval": "echo 'TODO: eval suite (Faz 5/8)'"
+    "eval": "echo 'TODO: eval suite (Faz 8)'"
+  },
+  "dependencies": {
+    "@google/genai": "^0.7.0",
+    "@niyet/core": "workspace:*",
+    "@niyet/db": "workspace:*",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@niyet/tsconfig": "workspace:*",
