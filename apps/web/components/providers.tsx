@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { Toaster as SonnerToaster } from 'sonner';
 import { useState } from 'react';
 
+import { RealtimeBootstrap } from '@/components/realtime-bootstrap';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
         <TooltipProvider>
+          <RealtimeBootstrap />
           {children}
           <SonnerToaster position="top-center" richColors />
         </TooltipProvider>
