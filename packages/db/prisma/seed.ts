@@ -146,25 +146,37 @@ function startOf90DayWindow(): Date {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Ana seed function
+// Parametrik seed: bir user için tüm demo veriyi olusturur.
+// Birden cok Auth user'a ayni demo'yu klonlamak icin export edildi.
 // ─────────────────────────────────────────────────────────────
-async function main() {
-  console.log('🌱 Seed başlıyor...');
+export interface SeedDemoInput {
+  /** Auth user'in id'si (uuid). Bos birakilirsa Prisma cuid uretir. */
+  id?: string;
+  email: string;
+  name: string;
+  age?: number;
+  monthlyIncome?: number;
+}
 
-  // 1. Mevcut Ayşe'yi temizle (idempotent)
-  const existing = await prisma.user.findUnique({ where: { email: 'ayse@niyet.app' } });
+export async function seedDemoForUser(input: SeedDemoInput) {
+  // RNG state'i her user icin sifirla — deterministic data
+  _rngState = 1337;
+
+  // 1. Mevcutu temizle (idempotent)
+  const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) {
-    console.log('🧹 Mevcut "Ayşe" siliniyor (cascade)...');
+    console.log(`🧹 Mevcut "${input.email}" siliniyor (cascade)...`);
     await prisma.user.delete({ where: { id: existing.id } });
   }
 
   // 2. User
   const ayse = await prisma.user.create({
     data: {
-      email: 'ayse@niyet.app',
-      name: 'Ayşe Yılmaz',
-      age: 22,
-      monthlyIncome: 8000,
+      ...(input.id ? { id: input.id } : {}),
+      email: input.email,
+      name: input.name,
+      age: input.age ?? 22,
+      monthlyIncome: input.monthlyIncome ?? 8000,
       consentAcceptedAt: new Date(),
       consentVersion: '1.0',
     },
@@ -456,11 +468,27 @@ async function main() {
   console.log(`   Transaction: ${txCount}`);
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Seed başarısız:', e);
-    process.exit(1);
-  })
-  .finally(() => {
-    void prisma.$disconnect();
+// CLI entry — `bun --filter @niyet/db seed` ile cagrildiginda Ayse default'una donulur.
+async function main() {
+  console.log('🌱 Seed başlıyor...');
+  await seedDemoForUser({
+    email: 'ayse@niyet.app',
+    name: 'Ayşe Yılmaz',
+    age: 22,
+    monthlyIncome: 8000,
   });
+}
+
+// Sadece bu dosya DOGRUDAN calistirildiginda main()'i tetikle.
+// Diger script'ler seedDemoForUser'i import ederken main() yan etkisi gormez.
+const isDirectExecution = (import.meta as { main?: boolean }).main === true;
+if (isDirectExecution) {
+  main()
+    .catch((e) => {
+      console.error('❌ Seed başarısız:', e);
+      process.exit(1);
+    })
+    .finally(() => {
+      void prisma.$disconnect();
+    });
+}
