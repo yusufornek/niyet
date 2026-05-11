@@ -62,6 +62,22 @@ builder.queryField('analysisHistory', (t) =>
   }),
 );
 
+builder.queryField('analysisRun', (t) =>
+  t.prismaField({
+    type: 'AnalysisRun',
+    nullable: true,
+    authScopes: { authenticated: true },
+    description: "Tek bir analiz run'ı (TransactionAnalysis detaylarıyla)",
+    args: { id: t.arg.id({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      return ctx.prisma.analysisRun.findFirst({
+        ...query,
+        where: { id: String(args.id), userId: ctx.userId! },
+      });
+    },
+  }),
+);
+
 // Cache penceresi: aynı user 1 saat içinde tekrar tetiklerse son run dönülür
 const CACHE_WINDOW_MS = 60 * 60 * 1000;
 

@@ -140,6 +140,26 @@ export interface AnalysisRunItem {
   error: string | null;
 }
 
+export interface TransactionAnalysisDetail {
+  id: string;
+  suggestedCategory: SpendingCategory | null;
+  markedSubscription: boolean;
+  reducibleAmount: number | null;
+  reasoning: string | null;
+  transaction: {
+    id: string;
+    merchant: string;
+    amount: number;
+    category: SpendingCategory;
+    occurredAt: string;
+  };
+}
+
+export interface AnalysisRunDetail extends AnalysisRunItem {
+  totalTokens: number | null;
+  transactionAnalyses: TransactionAnalysisDetail[];
+}
+
 export interface Circle {
   id: string;
   name: string;
@@ -199,6 +219,15 @@ const NOTIFICATIONS_Q = `query Notifications($unreadOnly: Boolean) {
 const ANALYSIS_HISTORY_Q = `query AnalysisHistory($limit: Int) {
   analysisHistory(limit: $limit) {
     id triggeredAt geminiModel durationMs totalTransactions totalOpportunity error
+  }
+}`;
+const ANALYSIS_RUN_Q = `query AnalysisRun($id: ID!) {
+  analysisRun(id: $id) {
+    id triggeredAt geminiModel durationMs totalTransactions totalOpportunity error totalTokens
+    transactionAnalyses {
+      id suggestedCategory markedSubscription reducibleAmount reasoning
+      transaction { id merchant amount category occurredAt }
+    }
   }
 }`;
 const CIRCLES_Q = `query Circles {
@@ -295,6 +324,17 @@ export const useAnalysisHistory = (limit = 10) =>
         limit,
       }),
     staleTime: 30_000,
+  });
+
+export const useAnalysisRun = (id: string) =>
+  useQuery({
+    queryKey: ['analysisRun', id],
+    queryFn: () =>
+      gqlFetcher<{ analysisRun: AnalysisRunDetail | null }, { id: string }>(ANALYSIS_RUN_Q, {
+        id,
+      }),
+    staleTime: 60_000,
+    enabled: !!id,
   });
 
 export const useCircles = () =>
