@@ -6,10 +6,19 @@
 
 ## 1. Geliştirme İş Akışı
 
-### 1.1. Branching Stratejisi: Trunk-Based + Opsiyonel PR
-- **Default**: `main` branch'e doğrudan push
-- **Büyük/riskli değişiklikler**: feature branch + Pull Request + squash-merge
-- Branch isimlendirme: `<tip>/<kısa-açıklama>` örn: `feat/gemini-pipeline`, `fix/dashboard-loading`
+### 1.1. Branching Stratejisi: Feature Branch + Manuel Merge
+- **Default**: Her özellik/faz **kendi feature branch'inde** geliştirilir
+- **Main'e direkt push YOK** — main yalnızca onaylı merge'lerle güncellenir
+- Branch push edilince proje sahibi gözden geçirir ve "merge" onayı verir → **squash-merge**
+- Branch isimlendirme: `<tip>/<kısa-açıklama>` (Conventional Commits tipleri):
+  - `feat/<topic>` — yeni özellik (örn: `feat/web-foundation`, `feat/gemini-pipeline`)
+  - `fix/<topic>` — bug fix
+  - `chore/<topic>` — config/process (örn: `chore/branching-workflow`)
+  - `docs/<topic>` — sadece doküman
+  - `refactor/<topic>` — yeniden organizasyon
+- Branch ömrü kısa olsun (1-3 gün ideal); merge edilene kadar `git rebase main` ile güncel tut
+
+> **Karar gerekçesi**: Demo süresi 2+ ay; jüriye link verilecek; main her an demo-edilebilir kalmalı. Proje sahibinin manuel onayı kalite/kapsam kontrolü sağlar. Detay: `MEMORY.md` ADR-009.
 
 ### 1.2. Commit Mesajları: Conventional Commits
 

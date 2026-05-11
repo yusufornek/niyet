@@ -22,7 +22,7 @@ Detay: `docs/project-brief/Niyet_Mikro_Emeklilik_Proje_Raporu.pdf`
 | **GraphQL (Pothos + Yoga)** | Code-first %100 type-safe; ileride RN için aynı schema (Apollo Client) | REST: mobile için daha az verimli; tRPC: RN entegrasyonu zayıf |
 | **Gemini 2.5 Flash + Function Calling** | Cost/quality optimum; structured action output (set_category, mark_subscription, ...) | GPT-4: pahalı; Claude: function calling daha karmaşık |
 | **Turborepo + Bun workspaces** | Pipeline caching; Vercel native; Bun hız | pnpm: yavaş; Nx: 2-3 kişiye ağır |
-| **Trunk-based + Conventional Commits** | 2-3 kişi için hızlı iterasyon; otomatik changelog'a hazır | Git Flow: aşırı süreç |
+| **Feature-branch + Manuel merge** | Demo'da main her zaman stabil; proje sahibi her merge'ü onaylar | Trunk-based: hızlı ama main kırılma riski |
 | **shadcn/ui + Tailwind** | Mockup'ta zaten kurulu; component'lerin sahibi sen olursun | MUI/Chakra: bundle ağır |
 
 Karar log'u: `MEMORY.md`

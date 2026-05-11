@@ -154,7 +154,7 @@ cd apps/web && bunx shadcn@latest add <component-name>
 - **Prisma**: Schema-first, otomatik type, DX iyi
 - **GraphQL (Pothos)**: Type-safe code-first, ileride RN için aynı schema
 - **Gemini 2.5 Flash + Function Calling**: Maliyet/kalite optimum, structured output
-- **Trunk-based + Conventional Commits**: Küçük ekip, hızlı iterasyon
+- **Feature-branch + Manuel merge**: Proje sahibi main'e ne girdiğini explicit onayla kontrol eder (Conventional Commits, squash-merge)
 - **Türkçe-only şimdilik**: Demo için pragmatic
 
 ---

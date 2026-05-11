@@ -95,7 +95,7 @@ Karar gerekçeleri için [HANDOFF.md](./HANDOFF.md), [MEMORY.md](./MEMORY.md) (A
 ## Katkıda Bulunma
 
 [CONTRIBUTING.md](./CONTRIBUTING.md) dokümanına bakın. Özetle:
-- **Branching**: Trunk-based (main'e push). Büyük değişiklik için feature branch + PR.
+- **Branching**: Feature-branch + manuel merge. Her özellik/faz kendi branch'inde geliştirilir; proje sahibi explicit onay ile main'e geçer (squash-merge).
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) (feat:/fix:/docs:/...)
 - **CI gate'leri**: lint + type-check + test her push'ta çalışır.
 

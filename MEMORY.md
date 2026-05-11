@@ -119,9 +119,9 @@ Gemini 2.5 Flash + Function Calling. Function definitions: `set_transaction_cate
 
 ## ADR-004: Trunk-based development + Conventional Commits
 **Tarih**: 2026-05-11
-**Durum**: Accepted
+**Durum**: Superseded by ADR-009 (2026-05-11)
 **Karar verenler**: Yusuf
-**Revisit**: Ekip 4+ kişiye çıkarsa
+**Revisit**: —
 
 ### Bağlam
 2-3 kişilik full-stack ekip, hızlı iterasyon gerekiyor. PR + review overhead'i sınırlamak istiyoruz ama main'in stabil kalması da kritik.
@@ -237,5 +237,44 @@ Repo root'unda 8 doküman:
 **Negatif**: 8 dosyayı güncel tutmak disiplin gerektirir. Solution: her PR'da "doc güncellendi mi?" check'i.
 
 ---
+
+## ADR-009: Feature-branch + Manual Merge (ADR-004'ün yerine)
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Ekibin akışı oturduğunda
+
+### Bağlam
+ADR-004 trunk-based development önermişti (main'e doğrudan push). Faz 0 sonrası geliştirme sürecini düşünürken proje sahibi (Yusuf) main'e ne girdiğini **manuel onay** ile kontrol etmek istediğini belirtti. Demo süresi 2+ ay; jüriye gidecek bir ürün; main'in her zaman "demo edilebilir" kalması kritik.
+
+### Alternatifler
+- **Trunk-based**: hızlı, ama main'i kırma riski yüksek
+- **Feature branch + manual merge** (seçildi): her değişiklik branch'te birikir, sahibi onayıyla main'e geçer
+- **Feature branch + auto-merge after CI green**: CI yeşilse otomatik merge — ama sahibi gözden geçirmek istiyor
+
+### Karar
+- **Default: feature branch + manual merge**
+- Her özellik/faz **kendi branch'inde** geliştirilir (`feat/`, `fix/`, `chore/`, `docs/` prefix'leri)
+- Branch hazır olduğunda push edilir; proje sahibi **explicit "merge" onayı** vermeden main'e geçmez
+- Merge yöntemi: **squash-merge** (linear history)
+- CI her push'ta çalışır (PR olsun olmasın); merge öncesi yeşil olmak zorunda
+- Pre-push hook trunk-based için kritikti; feature branch'te de korunur ama "broken main" riski büyük ölçüde azalmıştır
+- Branch isimlendirme:
+  - `feat/<topic>` — yeni özellik (örn: `feat/web-foundation`, `feat/gemini-pipeline`)
+  - `fix/<topic>` — bug fix
+  - `chore/<topic>` — config/process (örn: `chore/branching-workflow`)
+  - `docs/<topic>` — sadece doküman
+  - `refactor/<topic>` — yeniden organizasyon
+
+### Sonuçları
+**Pozitif**:
+- Main her zaman demo-edilebilir; jüriye link verince crash riski minimum
+- Sahibi context oluyor: her merge öncesi diff'i görüyor, soru sorabiliyor
+- Yarım kalmış işler main'i kirletmez
+
+**Negatif**:
+- Manuel onay süreci hızı yavaşlatır (özellikle solo veya 2 kişi için)
+- Merge bekleyen branch'ler birikebilir (çözüm: küçük branch'ler, sık merge)
+- "Tek kişi gate" — sahibi yoksa merge olmaz (Faz 8'de back-up reviewer atanabilir)
 
 <!-- Yeni ADR'lar buraya eklenir -->
