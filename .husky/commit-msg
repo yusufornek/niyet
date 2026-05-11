@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Niyet — Conventional Commits formatını commit message üzerinde doğrula
+bunx --no-install commitlint --edit "$1"

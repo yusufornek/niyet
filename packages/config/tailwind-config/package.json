@@ -1,0 +1,15 @@
+{
+  "name": "@niyet/tailwind-config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "@tailwindcss/typography": "^0.5.16"
+  }
+}

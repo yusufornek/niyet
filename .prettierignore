@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+dist
+build
+.turbo
+coverage
+playwright-report
+test-results
+**/generated
+**/prisma/migrations
+bun.lockb
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+apps/web-legacy

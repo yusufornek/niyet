@@ -1,0 +1,11 @@
+# Bun configuration for Niyet monorepo
+
+[install]
+# Workspaces installed via root
+exact = false
+# Use hoisting (similar to npm) for compatibility with Next.js
+linker = "hoisted"
+
+[install.scopes]
+# Public npm registry
+"@niyet" = { url = "https://registry.npmjs.org" }

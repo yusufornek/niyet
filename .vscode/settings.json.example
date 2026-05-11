@@ -1,0 +1,54 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "never"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "tailwindCSS.experimental.classRegex": [
+    ["cn\\(([^)]*)\\)", "['\"`]([^'\"`]*)['\"`]"],
+    ["cva\\(([^)]*)\\)", "['\"`]([^'\"`]*)['\"`]"]
+  ],
+  "cSpell.language": "en,tr",
+  "cSpell.words": [
+    "niyet",
+    "shadcn",
+    "Pothos",
+    "Supabase",
+    "Vercel",
+    "Turborepo",
+    "Bun",
+    "Recharts",
+    "Sonner",
+    "TanStack",
+    "Zustand",
+    "Tailwind",
+    "Vitest",
+    "Playwright",
+    "Prisma",
+    "Gemini",
+    "Vite",
+    "Lovable",
+    "lucide",
+    "Onboarding",
+    "Birikim",
+    "Çember",
+    "Çemberi",
+    "Tasarruf",
+    "Emeklilik"
+  ]
+}

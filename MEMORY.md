@@ -1,0 +1,241 @@
+# MEMORY.md — Architecture Decision Records
+
+> Projedeki **mühendislik kararlarının log'u**. Her ADR (Architecture Decision Record) bir kararın **tarihi**, **bağlamı**, **alternatifleri**, **gerekçesini** ve **revisit tarihini** içerir. Karar değişirse yeni ADR yazılır, eskisi `superseded` işaretlenir.
+
+---
+
+## ADR Şablonu
+
+```
+## ADR-NNN: Karar başlığı
+**Tarih**: YYYY-MM-DD
+**Durum**: Accepted | Superseded by ADR-XYZ | Deprecated
+**Karar verenler**: <isimler>
+**Revisit**: YYYY-MM-DD (veya "gerekirse")
+
+### Bağlam
+Neden bu karara ihtiyaç duyuldu?
+
+### Alternatifler
+A, B, C — neden seçilmedi?
+
+### Karar
+Seçilen seçenek.
+
+### Sonuçları
+Pozitif ve negatif etkileri.
+```
+
+---
+
+## ADR-001: Next.js + Supabase + Prisma + GraphQL stack seçimi
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Demo sonrası (yaklaşık 2026-07)
+
+### Bağlam
+Yarışma jürisine **web link** ile gönderilecek bir mikro emeklilik platformu inşa edilecek. Yasal hazırlık nedeniyle gerçek banka entegrasyonu yok; mock data + Gemini AI ile uçtan uca akış simüle edilecek. 2-3 kişilik full-stack ekip, 2+ ay süre. Eldeki Vite + React + shadcn/ui mockup'ı 20 ekran ile tamamlanmış (Lovable.dev ile üretilmiş).
+
+### Alternatifler
+
+| Stack | Avantaj | Dezavantaj |
+|---|---|---|
+| **Next.js + Supabase + Prisma + GraphQL** (seçildi) | SSR/RSC, auth+DB+realtime tek yerde, code-first type-safe API, mobile için RN/Apollo hazırlığı | GraphQL overhead 2-3 kişi için fazla olabilir |
+| Vite SPA + Express/Fastify + Postgres | Daha basit, mockup'ı korur | Auth/realtime ayrı setup, SSR yok |
+| Next.js + Vercel KV + Server Actions | En modern, en hafif | Vendor lock-in, mobile çıkarımı zor |
+| RN Expo + tRPC | Mobile-first | Jüri demosu için TestFlight/APK zahmeti |
+
+### Karar
+**Next.js 15 (App Router) + Supabase (DB+Auth+Realtime) + Prisma + GraphQL (Pothos+Yoga)** stack'ini seçtim. Mevcut Vite mockup tasarım referansı olarak `apps/web-legacy/`'de korunacak; yeni kod Next.js'te yazılacak. Monorepo (Turborepo + Bun workspaces) ileride RN Expo eklemek için hazır olur.
+
+### Sonuçları
+**Pozitif**:
+- Jüri için tek tık deploy (Vercel)
+- Type-safe API (Pothos + Prisma)
+- DB seviyesinde authorization (Supabase RLS)
+- Mobile için hazır altyapı
+
+**Negatif**:
+- GraphQL plumbing 2-3 kişi için biraz fazla; gerekçe RN için.
+- Supabase + Prisma "connection_limit=1 + pgbouncer" trick'i öğrenme eğrisi var.
+- Monorepo setup zamanı (~1 gün) demo süresinden çıkar.
+
+---
+
+## ADR-002: Mevcut Vite mockup'ını Next.js'e port et, sıfırdan yazma
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Faz 2 sonrası
+
+### Bağlam
+Vite + React + shadcn/ui ile 20 ekranlık tıklanabilir mockup mevcut. ADR-001 ile Next.js seçildi. İki seçenek: (a) Vite'ı koru, ayrı backend ekle (b) Next.js'e port et.
+
+### Alternatifler
+- **Vite'ı koru** + ayrı backend: Frontend yatırımı korunur ama 2 deployment, 2 CORS, SSR yok, auth integration zor
+- **Next.js'e port** (seçildi): 2-3 günlük migration cost ama uzun vadeli temizlik, SSR/auth temiz
+- **Mockup'ı tamamen at**, sıfırdan Next.js: tasarım yatırımı çöp olur
+
+### Karar
+Vite mockup'ı `apps/web-legacy/` altında referans olarak tut. Next.js `apps/web/` altında sıfırdan kur ama:
+- CSS token'lar (`index.css`) 1:1 kopyala
+- shadcn/ui primitives (`components/ui/*`) 1:1 kopyala
+- Custom components (PhoneShell, ScoreCard) 1:1 kopyala
+- Screen layout'ları içerikleriyle birlikte taşı (her ekran ayrı `page.tsx`)
+- Zustand mock data'ları Prisma seed'e taşı
+- react-router-dom kaldır, App Router file-based routing kullan
+
+### Sonuçları
+**Pozitif**: Tasarım yatırımı korunur, mimari temiz başlar.
+**Negatif**: Port migrationu Faz 2'de ~6 saat.
+
+---
+
+## ADR-003: Gemini 2.5 Flash + Function Calling
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Faz 5 testten sonra
+
+### Bağlam
+AI ile transaction'ları kategorize etmek, abonelik tespit etmek, azaltılabilir harcamaları flagle ihtiyacı var. Gemini, OpenAI, Anthropic seçenekleri var.
+
+### Alternatifler
+- Gemini 2.5 Flash + JSON output (free-form): Token ucuz ama parsing manuel
+- **Gemini 2.5 Flash + Function Calling** (seçildi): Structured, retry-friendly, action-oriented
+- Gemini 1.5 Pro: Daha kaliteli ama 5x pahalı
+- GPT-4o: Kaliteli ama daha pahalı, ToS açısından mahsurlu
+- Claude 3.5 Sonnet: Yetenekli ama Türkçe nüans bazen Gemini'den zayıf
+
+### Karar
+Gemini 2.5 Flash + Function Calling. Function definitions: `set_transaction_category`, `mark_as_subscription`, `flag_reducible`, `recommend_micro_saving`. Her function call backend executor tarafından DB'ye yansıtılır.
+
+### Sonuçları
+**Pozitif**: Maliyet düşük (~$0.01/run), structured output, retry kolay, batch tek call.
+**Negatif**: Function calling Gemini implementasyonu OpenAI'dan farklı; öğrenme eğrisi.
+
+---
+
+## ADR-004: Trunk-based development + Conventional Commits
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Ekip 4+ kişiye çıkarsa
+
+### Bağlam
+2-3 kişilik full-stack ekip, hızlı iterasyon gerekiyor. PR + review overhead'i sınırlamak istiyoruz ama main'in stabil kalması da kritik.
+
+### Karar
+- **Trunk-based**: main'e direkt push. Büyük değişiklikler için opsiyonel feature branch + PR (squash-merge).
+- **Pre-push hook (Husky)**: lint + type-check + quick test zorunlu (broken main'i baştan engelle).
+- **Conventional Commits + commitlint**: feat/fix/docs/refactor/test/chore/perf/style/build/ci/revert tipleri.
+- **CI**: her push'ta GitHub Actions (lint + type-check + vitest) çalışır.
+
+### Sonuçları
+**Pozitif**: Hızlı iterasyon, review overhead minimum.
+**Negatif**: Disiplin gerektirir. Yeni ekip üyesi `--no-verify` çalıştırırsa kuralları by-pass eder.
+
+---
+
+## ADR-005: Bun package manager + Turborepo
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Vercel Bun runtime stabilleşince (?)
+
+### Bağlam
+Mockup'ta zaten Bun kullanılmış (`bun.lockb`). Monorepo gerekiyor (web + db + graphql + ai + core paketleri). Vercel'in Next.js'i Node.js runtime'da çalıştırması bilinen kısıt.
+
+### Karar
+- **Bun** dev/install/test için (hız avantajı)
+- **Vercel'de prod Node.js runtime** (Next.js bunu otomatik yapar)
+- **Turborepo** pipeline caching ve cross-package orchestration için
+- **Bun workspaces** (pnpm/npm yerine)
+
+### Sonuçları
+**Pozitif**: `bun install` çok hızlı, native test runner, modern DX.
+**Negatif**: Bazı Node-only paketler Bun'da sorun çıkarabilir (örn. Prisma binary'leri); workaround'lar bilinir.
+
+---
+
+## ADR-006: Demo persona "Ayşe" — öğrenci 22 yaş 8K ₺/ay
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: İkinci persona eklenirse
+
+### Bağlam
+Jüri demosu için tek bir demo user'ı seed'leyeceğiz. Persona seçimi storytelling'i etkiler.
+
+### Alternatifler
+- Genç profesyonel (28, 35K ₺): orta-üst gelir, dengeli
+- Freelancer (26, düzensiz): "Pause Contribution" feature için iyi
+- Aileli çalışan (32, ev+çocuk): "Aile Çemberi" için iyi
+- **Öğrenci (22, 8K ₺)** (seçildi): mikro birikim hikayesi en güçlü, hedef kitle ile duygusal bağ
+
+### Karar
+"Ayşe" — 22 yaş, İstanbul, üniversite son sınıf, 8K ₺/ay (burs+part-time). Tipik harcama:
+- Kahve haftalık 4x, yemek siparişi 3x, market 1x
+- Abonelikler: Netflix, Spotify, Disney+, ChatGPT Plus (1.172 ₺/ay)
+- Online alışveriş ayda 2x Trendyol
+- Tasarruf fırsatı 90 günde ~6.000 ₺
+
+### Sonuçları
+**Pozitif**: Jüri için duygusal bağ; küçük tutarlardan büyük etkiye ulaşma hikayesi güçlü.
+**Negatif**: Tek persona, B2B kitlesini (orta yaş) tam yansıtmaz. Faz 7'de ek persona eklenebilir.
+
+---
+
+## ADR-007: 15 sabit Türkçe kategori enum
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+**Revisit**: Kullanıcı feedback'i sonrası
+
+### Bağlam
+Harcama kategorilerinin nasıl yönetileceğine karar verme. Performance, UI consistency, Gemini token kullanımı önemli.
+
+### Alternatifler
+- 12 sade kategori
+- **15 zengin kategori** (seçildi)
+- 8 minimal kategori
+- Hierarchical (Yiyecek > Restoran > Fast Food)
+- Free-form + normalize
+
+### Karar
+15 sabit Türkçe enum (Prisma `SpendingCategory`):
+MARKET, FOOD_DELIVERY, COFFEE, DINING_OUT, TRANSPORT, FUEL, BILLS, SUBSCRIPTIONS, ONLINE_SHOPPING, CLOTHING, HEALTH, ENTERTAINMENT, EDUCATION, SPORTS, OTHER
+
+### Sonuçları
+**Pozitif**: Gemini token-efficient, DB indexed enum, UI tutarlı ikon/renk eşlemesi.
+**Negatif**: Edge case'ler "OTHER"a düşer; gerçek banka entegrasyonunda zenginleştirilebilir.
+
+---
+
+## ADR-008: Doküman seti seçimi
+**Tarih**: 2026-05-11
+**Durum**: Accepted
+**Karar verenler**: Yusuf
+
+### Bağlam
+Yusuf "CLAUDE.md, HANDOFF.md, MEMORY.md vs yazıp pushlayacağız" dedi. Hangi doc'lar gerek?
+
+### Karar
+Repo root'unda 8 doküman:
+1. **README.md** — public intro + setup
+2. **CLAUDE.md** — AI asistan rehberi
+3. **HANDOFF.md** — yeni ekip üyesi onboarding
+4. **ARCHITECTURE.md** — sistem mimarisi diyagramı
+5. **MEMORY.md** — ADR log'u (bu dosya)
+6. **CONTRIBUTING.md** — commit/PR/branching kuralları
+7. **SECURITY.md** — KVKK + secrets + RLS notları
+8. **.env.example** — env vars şablonu
+
+### Sonuçları
+**Pozitif**: Yeni ekip üyesi 1 saatte oryantasyon olabilir.
+**Negatif**: 8 dosyayı güncel tutmak disiplin gerektirir. Solution: her PR'da "doc güncellendi mi?" check'i.
+
+---
+
+<!-- Yeni ADR'lar buraya eklenir -->

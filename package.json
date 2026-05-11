@@ -1,0 +1,53 @@
+{
+  "name": "niyet",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Niyet — AI Destekli Mikro Emeklilik ve Birikim Alışkanlığı Platformu",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/config/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "db:generate": "bun --filter @niyet/db run generate",
+    "db:migrate": "bun --filter @niyet/db run migrate",
+    "db:seed": "bun --filter @niyet/db run seed",
+    "db:reset": "bun --filter @niyet/db run reset",
+    "db:studio": "bun --filter @niyet/db run studio",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@types/node": "^22.10.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.9",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "bun@1.1.38",
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Niyet — Push öncesi tam kalite gate'i
+# main her zaman deploy-edilebilir olmalı (trunk-based)
+echo "→ Pre-push gate: lint + type-check + test"
+bun run lint && bun run type-check && bun run test

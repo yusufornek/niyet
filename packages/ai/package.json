@@ -1,0 +1,20 @@
+{
+  "name": "@niyet/ai",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./functions": "./src/functions/index.ts",
+    "./prompts": "./src/prompts/index.ts"
+  },
+  "scripts": {
+    "build": "echo 'ai: build (placeholder)'",
+    "lint": "echo 'ai: lint (placeholder)'",
+    "type-check": "tsc --noEmit",
+    "test": "echo 'ai: test (placeholder)'",
+    "eval": "echo 'TODO: eval suite (Faz 5/8)'"
+  }
+}
