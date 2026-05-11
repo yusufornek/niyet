@@ -1,11 +1,16 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { Check, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
-import { useAnalysisRun, type SpendingCategory } from '@/lib/graphql/queries';
+import {
+  useAnalysisRun,
+  useEditTransactionCategory,
+  type SpendingCategory,
+} from '@/lib/graphql/queries';
 import { formatTRY } from '@/lib/utils';
 
 const CATEGORY_META: Record<SpendingCategory, { label: string; icon: string }> = {
@@ -30,6 +35,8 @@ export default function AnalysisDetailPage() {
   const params = useParams<{ id: string }>();
   const { data, isLoading } = useAnalysisRun(params.id);
   const run = data?.analysisRun;
+  const editCategory = useEditTransactionCategory();
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
 
   if (isLoading) {
     return (
@@ -197,18 +204,55 @@ export default function AnalysisDetailPage() {
 
       {categoryAnalyses.length > 0 && (
         <>
-          <div className="ny-eyebrow mb-2">Yeniden sınıflandırma önerileri</div>
+          <div className="ny-eyebrow mb-2">AI&apos;ın yeniden sınıflandırma önerileri</div>
+          <p className="mb-2 text-xs opacity-60">
+            AI bu işlemlerin başka kategoride olduğunu düşünüyor. Onayla ya da reddet.
+          </p>
           <div className="mb-4 space-y-2">
-            {categoryAnalyses.slice(0, 5).map((a) => {
+            {categoryAnalyses.slice(0, 8).map((a) => {
               const oldMeta = CATEGORY_META[a.transaction.category];
               const newMeta = a.suggestedCategory ? CATEGORY_META[a.suggestedCategory] : null;
+              // AI önerisi mevcut kategori ile aynıysa veya zaten kullanıcı düzelttiyse skip
+              const alreadyApplied = a.transaction.category === a.suggestedCategory;
+              const dismissed = dismissedSuggestions.has(a.id);
+              if (alreadyApplied || dismissed) return null;
               return (
                 <div key={a.id} className="ny-card !p-3 text-sm">
-                  <div className="font-semibold">{a.transaction.merchant}</div>
-                  <div className="mt-1 text-xs opacity-70">
-                    {oldMeta?.label} → {newMeta?.label}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="font-semibold">{a.transaction.merchant}</div>
+                      <div className="mt-1 text-xs">
+                        <span className="line-through opacity-50">{oldMeta?.label}</span>{' '}
+                        <span className="text-primary">→ {newMeta?.label}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs opacity-60">{formatTRY(a.transaction.amount)}</span>
                   </div>
-                  {a.reasoning && <p className="mt-1 text-xs opacity-60">{a.reasoning}</p>}
+                  {a.reasoning && <p className="mt-2 text-xs opacity-70">{a.reasoning}</p>}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (!a.suggestedCategory) return;
+                        editCategory.mutate(
+                          { id: a.transaction.id, category: a.suggestedCategory },
+                          {
+                            onSuccess: () => setDismissedSuggestions((s) => new Set(s).add(a.id)),
+                          },
+                        );
+                      }}
+                      disabled={editCategory.isPending}
+                      className="ny-pill-sm flex-1 !py-1.5 !text-xs disabled:opacity-50"
+                    >
+                      <Check size={11} className="mr-1" /> Kabul et
+                    </button>
+                    <button
+                      onClick={() => setDismissedSuggestions((s) => new Set(s).add(a.id))}
+                      className="ny-chip !py-1 text-xs"
+                      aria-label="Reddet"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
                 </div>
               );
             })}

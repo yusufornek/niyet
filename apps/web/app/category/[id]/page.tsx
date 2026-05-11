@@ -192,11 +192,14 @@ export default function CategoryDetailPage() {
         </div>
       )}
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <button onClick={() => router.push('/radar')} className="ny-pill-ghost text-sm">
-          Tüm kategoriler
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <button onClick={() => router.push('/radar')} className="ny-pill-ghost text-xs">
+          Kategoriler
         </button>
-        <button onClick={() => router.push('/contributions')} className="ny-pill-ghost text-sm">
+        <button onClick={() => router.push('/transactions')} className="ny-pill-ghost text-xs">
+          Tüm işlemler
+        </button>
+        <button onClick={() => router.push('/contributions')} className="ny-pill-ghost text-xs">
           Katkılarım
         </button>
       </div>

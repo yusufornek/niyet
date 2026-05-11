@@ -4,6 +4,7 @@ import {
   CreditCard,
   GraduationCap,
   History as HistoryIcon,
+  ListChecks,
   Pause,
   PiggyBank,
   Settings,
@@ -209,13 +210,13 @@ export default function DashboardPage() {
       <div className="ny-eyebrow mb-2 mt-5">Hızlı erişim</div>
       <div className="mb-3 grid grid-cols-3 gap-3">
         <QuickTile icon={<PiggyBank size={18} />} label="Katkılar" href="/contributions" />
+        <QuickTile icon={<ListChecks size={18} />} label="İşlemler" href="/transactions" />
         <QuickTile icon={<HistoryIcon size={18} />} label="Analizler" href="/history" />
         <QuickTile icon={<CreditCard size={18} />} label="Abonelik" href="/subscriptions" />
         <QuickTile icon={<Users size={18} />} label="Çemberler" href="/circles" />
         <QuickTile icon={<Pause size={18} />} label="Nefes ayı" href="/pause" />
         <QuickTile icon={<GraduationCap size={18} />} label="Öğren" href="/learn" />
         <QuickTile icon={<TrendingUp size={18} />} label="Fonlar" href="/funds" />
-        <QuickTile icon={<Settings size={18} />} label="Ayarlar" href="/settings" />
       </div>
 
       <div className="ny-card mb-3">
