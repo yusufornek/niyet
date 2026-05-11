@@ -233,7 +233,7 @@ export default function GoalDetailPage() {
       <button
         onClick={() => {
           updateGoal.mutate({ id: goal.id, input: { coachContext: goal.name } });
-          router.push('/chatbot');
+          router.push(`/chatbot?goalId=${goal.id}`);
         }}
         className="ny-pill flex w-full items-center justify-center gap-2"
       >

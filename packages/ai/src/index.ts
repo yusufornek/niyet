@@ -1,12 +1,14 @@
 /**
  * @niyet/ai — Gemini integration + agentic patterns.
  *
- * Faz 5: Spending Analyzer Agent (Pattern A) tamamlandı.
- * Pattern B (AI Saving Coach) ve Pattern C (Goal Forecaster) sonraki fazlarda.
+ * Pattern A: Spending Analyzer (batch function calling)
+ * Pattern B: AI Saving Coach (multi-turn agent loop)
  *
  * Detay: ENGINEERING.md §12-13
  */
 export { GEMINI_MODEL, getGeminiClient } from './client';
+
+// Pattern A — Spending Analyzer
 export {
   ALL_FUNCTIONS,
   FLAG_REDUCIBLE_FUNCTION,
@@ -26,4 +28,15 @@ export {
   type SubscriptionMark,
 } from './pipelines/spending-analyzer';
 
-export const AI_PACKAGE_VERSION = '0.1.0';
+// Pattern B — AI Saving Coach
+export { COACH_TOOLS } from './functions/coach-tools';
+export { SAVING_COACH_SYSTEM_PROMPT } from './prompts/saving-coach';
+export {
+  runSavingCoach,
+  type ChatHistoryItem,
+  type CoachRecommendation,
+  type CoachResult,
+  type CoachToolCallTrace,
+} from './agents/saving-coach';
+
+export const AI_PACKAGE_VERSION = '0.2.0';

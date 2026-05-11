@@ -84,6 +84,49 @@ export interface ContributionSummary {
   last30dCount: number;
 }
 
+export type ChatRole = 'USER' | 'ASSISTANT' | 'TOOL';
+export type CoachActionType =
+  | 'ACCEPT_CATEGORY'
+  | 'CANCEL_SUBSCRIPTION'
+  | 'CREATE_RULE'
+  | 'OPEN_GOAL';
+
+export interface ChatMsg {
+  id: string;
+  role: ChatRole;
+  content: string;
+  toolName: string | null;
+  tokensUsed: number | null;
+  createdAt: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  goalContext: string | null;
+  geminiModel: string;
+  totalTokens: number;
+  createdAt: string;
+  updatedAt: string;
+  messages?: ChatMsg[];
+}
+
+export interface CoachRecommendation {
+  actionType: CoachActionType;
+  label: string;
+  targetRef: string | null;
+  reasoning: string;
+}
+
+export interface SendMessageResponse {
+  sessionId: string;
+  reply: string;
+  recommendation: CoachRecommendation | null;
+  totalTokens: number;
+  geminiModel: string;
+  stubMode: boolean;
+}
+
 export interface Me {
   id: string;
   email: string;
@@ -269,6 +312,27 @@ const ACCEPT_CATEGORY_CONTRIB_M = `mutation AcceptCategoryContribution($category
 
 const REVERSE_CONTRIB_M = `mutation ReverseContribution($id: ID!) {
   reverseContribution(id: $id) { id status reversedAt }
+}`;
+
+const CHAT_SESSIONS_Q = `query ChatSessions($limit: Int) {
+  chatSessions(limit: $limit) {
+    id title goalContext geminiModel totalTokens createdAt updatedAt
+  }
+}`;
+const CHAT_SESSION_Q = `query ChatSession($id: ID!) {
+  chatSession(id: $id) {
+    id title goalContext geminiModel totalTokens
+    messages { id role content toolName tokensUsed createdAt }
+  }
+}`;
+const SEND_CHAT_M = `mutation SendChatMessage($message: String!, $sessionId: ID, $goalContext: String) {
+  sendChatMessage(message: $message, sessionId: $sessionId, goalContext: $goalContext) {
+    sessionId reply totalTokens geminiModel stubMode
+    recommendation { actionType label targetRef reasoning }
+  }
+}`;
+const DELETE_CHAT_M = `mutation DeleteChatSession($id: ID!) {
+  deleteChatSession(id: $id)
 }`;
 const SUBSCRIPTIONS_Q = `query Subscriptions {
   subscriptions { id name amount frequency status detectedAt merchantPattern yearlyAmount }
@@ -715,5 +779,56 @@ export function useCancelSubscription() {
       );
     },
     onError: (e: Error) => toast.error('İptal edilemedi', { description: e.message }),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI Saving Coach (Pattern B) hooks
+// ─────────────────────────────────────────────────────────────
+
+export const useChatSessions = (limit = 20) =>
+  useQuery({
+    queryKey: ['chatSessions', limit],
+    queryFn: () =>
+      gqlFetcher<{ chatSessions: ChatSession[] }, { limit: number }>(CHAT_SESSIONS_Q, { limit }),
+    staleTime: 30_000,
+  });
+
+export const useChatSession = (id: string | null) =>
+  useQuery({
+    queryKey: ['chatSession', id],
+    queryFn: () =>
+      gqlFetcher<{ chatSession: ChatSession | null }, { id: string }>(CHAT_SESSION_Q, {
+        id: id!,
+      }),
+    staleTime: 5_000,
+    enabled: !!id,
+  });
+
+export function useSendChatMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { message: string; sessionId?: string; goalContext?: string }) =>
+      gqlFetcher<
+        { sendChatMessage: SendMessageResponse },
+        { message: string; sessionId?: string; goalContext?: string }
+      >(SEND_CHAT_M, vars),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['chatSession', data.sendChatMessage.sessionId] });
+      void qc.invalidateQueries({ queryKey: ['chatSessions'] });
+    },
+    onError: (e: Error) => toast.error('Mesaj gönderilemedi', { description: e.message }),
+  });
+}
+
+export function useDeleteChatSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<{ deleteChatSession: boolean }, { id: string }>(DELETE_CHAT_M, { id }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chatSessions'] });
+      toast.success('Sohbet silindi');
+    },
   });
 }
