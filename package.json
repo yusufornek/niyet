@@ -1,0 +1,24 @@
+{
+  "name": "niyet",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm --workspace @niyet/db run generate",
+    "db:migrate": "npm --workspace @niyet/db run migrate",
+    "dev": "npm --workspace @niyet/graphql run dev",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "type-check": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}

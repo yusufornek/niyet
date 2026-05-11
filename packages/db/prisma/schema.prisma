@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum GoalTrackingGoalStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum PriceAlertDirection {
+  INCREASE
+  DECREASE
+}
+
+model User {
+  id        String   @id @db.Uuid
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goalTrackingGoals GoalTrackingGoal[]
+}
+
+model GoalTrackingGoal {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  userId                String                 @db.Uuid
+  goalName              String
+  rawQuery              String
+  normalizedQuery       String
+  category              String?
+  selectedProductTitle  String
+  productUrl            String
+  productImage          String?
+  productSource         String
+  originalPrice         Decimal                @db.Decimal(12, 2)
+  currentPrice          Decimal                @db.Decimal(12, 2)
+  currency              String                 @default("TRY")
+  savedAmount           Decimal                @db.Decimal(12, 2)
+  targetDate            DateTime
+  lastCheckedAt         DateTime?
+  status                GoalTrackingGoalStatus @default(ACTIVE)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  priceHistory  GoalPriceHistory[]
+  priceAlerts   GoalPriceAlert[]
+
+  @@index([userId, status])
+  @@index([userId, targetDate])
+}
+
+model GoalPriceHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  goalId    String   @db.Uuid
+  checkedAt DateTime @default(now())
+  price     Decimal  @db.Decimal(12, 2)
+  currency  String   @default("TRY")
+  source    String
+
+  goal GoalTrackingGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, checkedAt])
+}
+
+model GoalPriceAlert {
+  id                   String              @id @default(uuid()) @db.Uuid
+  goalId               String              @db.Uuid
+  oldPrice             Decimal             @db.Decimal(12, 2)
+  newPrice             Decimal             @db.Decimal(12, 2)
+  percentageChange     Decimal             @db.Decimal(8, 6)
+  direction            PriceAlertDirection
+  remainingAmountImpact Decimal            @db.Decimal(12, 2)
+  monthlySavingNeeded  Decimal             @db.Decimal(12, 2)
+  readAt               DateTime?
+  createdAt            DateTime            @default(now())
+
+  goal GoalTrackingGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, readAt])
+}
