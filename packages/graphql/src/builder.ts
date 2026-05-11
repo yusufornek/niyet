@@ -40,6 +40,8 @@ export const builder = new SchemaBuilder<{
   // Pothos v4: plugin order matters — auth before others
   plugins: [ScopeAuthPlugin, PrismaPlugin, SimpleObjectsPlugin],
   scopeAuth: {
+    // Demo aşamasında: userId varsa authenticated (Ayşe fallback dahil).
+    // Production'da: real auth user için ctx.authId !== null kontrolüne geçilir.
     authScopes: async (ctx) => ({
       authenticated: ctx.userId !== null,
       public: true,
@@ -59,10 +61,6 @@ builder.addScalarType('JSON', GraphQLJSON);
 builder.addScalarType('NonNegativeFloat', NonNegativeFloatResolver);
 builder.addScalarType('NonNegativeInt', NonNegativeIntResolver);
 
-// Root tipleri — her query/mutation buradan eklenir
-builder.queryType({
-  authScopes: { public: true },
-});
-builder.mutationType({
-  authScopes: { authenticated: true },
-});
+// Root tipleri — her query/mutation field kendi authScope'unu tanımlar
+builder.queryType({});
+builder.mutationType({});

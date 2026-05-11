@@ -1,13 +1,17 @@
 'use client';
 
-import { Sparkles, X } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
-import { useCategoryBreakdown, useRunAnalysis, type SpendingCategory } from '@/lib/graphql/queries';
-import { useApp } from '@/lib/stores/use-app';
+import {
+  useAcceptCategoryContribution,
+  useCategoryBreakdown,
+  useRunAnalysis,
+  type SpendingCategory,
+} from '@/lib/graphql/queries';
 import { formatTRY } from '@/lib/utils';
 
 const CATEGORY_META: Record<SpendingCategory, { label: string; icon: string; color: string }> = {
@@ -30,20 +34,19 @@ const CATEGORY_META: Record<SpendingCategory, { label: string; icon: string; col
 
 export default function RadarPage() {
   const router = useRouter();
-  const selectCategory = useApp((s) => s.selectCategory);
-  const acceptSaving = useApp((s) => s.acceptSaving);
-  const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const { data, isLoading } = useCategoryBreakdown('LAST_30D');
   const runAnalysis = useRunAnalysis();
+  const acceptCategoryContribution = useAcceptCategoryContribution();
+  const [acceptedCategories, setAcceptedCategories] = useState<Record<string, boolean>>({});
 
   const rows = data?.categoryBreakdown ?? [];
   const totalSpent = rows.reduce((s, c) => s + c.total, 0);
   const totalOpp = rows.reduce((s, c) => s + c.opportunity, 0);
   const active = rows.find((c) => c.category === hoverId);
   const reducibleCount = rows.filter((c) => c.opportunity > 0).length;
-  const acceptedCount = Object.values(accepted).filter(Boolean).length;
+  const acceptedCount = Object.values(acceptedCategories).filter(Boolean).length;
 
   const R = 70;
   const STROKE = 22;
@@ -201,7 +204,7 @@ export default function RadarPage() {
           <div className="space-y-2">
             {rows.map((c) => {
               const meta = CATEGORY_META[c.category];
-              const isAcc = accepted[c.category];
+              const isAcc = acceptedCategories[c.category];
               const pct = totalSpent > 0 ? (c.total / totalSpent) * 100 : 0;
               const oppPct = c.total > 0 ? (c.opportunity / c.total) * 100 : 0;
               const reducible = c.opportunity > 0;
@@ -214,13 +217,7 @@ export default function RadarPage() {
                   onMouseEnter={() => setHoverId(c.category)}
                   onMouseLeave={() => setHoverId(null)}
                 >
-                  <button
-                    className="w-full"
-                    onClick={() => {
-                      selectCategory(c.category);
-                      router.push('/category');
-                    }}
-                  >
+                  <button className="w-full" onClick={() => router.push(`/category/${c.category}`)}>
                     <div className="flex items-center gap-3">
                       <span className="text-xl">{meta?.icon}</span>
                       <div className="flex-1 text-left">
@@ -261,21 +258,31 @@ export default function RadarPage() {
                   {reducible && (
                     <div className="mt-2 flex gap-2 pl-9">
                       <button
-                        disabled={isAcc}
+                        disabled={isAcc || acceptCategoryContribution.isPending}
                         onClick={() => {
-                          setAccepted((a) => ({ ...a, [c.category]: true }));
-                          acceptSaving(c.opportunity);
+                          acceptCategoryContribution.mutate(
+                            { category: c.category },
+                            {
+                              onSuccess: () =>
+                                setAcceptedCategories((a) => ({ ...a, [c.category]: true })),
+                            },
+                          );
                         }}
                         className="ny-pill-sm flex-1 !py-1.5 !text-xs disabled:opacity-50"
                       >
-                        {isAcc ? 'Kabul edildi ✓' : 'Katkıya dönüştür'}
+                        {isAcc ? (
+                          <span className="flex items-center justify-center gap-1">
+                            <Check size={12} /> Aktarıldı
+                          </span>
+                        ) : (
+                          'Katkıya dönüştür'
+                        )}
                       </button>
                       <button
-                        className="ny-chip !py-1"
-                        onClick={() => setAccepted((a) => ({ ...a, [c.category]: false }))}
-                        aria-label="Reddet"
+                        onClick={() => router.push(`/category/${c.category}`)}
+                        className="ny-chip !py-1 text-[11px]"
                       >
-                        <X size={12} />
+                        Detay
                       </button>
                     </div>
                   )}

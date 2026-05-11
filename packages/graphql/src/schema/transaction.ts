@@ -25,6 +25,11 @@ builder.prismaObject('Transaction', {
       nullable: true,
       resolve: (tx) => (tx.opportunity != null ? Number(tx.opportunity) : null),
     }),
+    /// Bu TX katkıya dönüştürüldü mü (acceptedContributionId set mi)
+    isAccepted: t.boolean({
+      resolve: (tx) => tx.acceptedContributionId != null,
+    }),
+    acceptedContribution: t.relation('acceptedContribution', { nullable: true }),
     account: t.relation('account'),
   }),
 });
@@ -130,6 +135,10 @@ const DashboardStats = builder.simpleObject('DashboardStats', {
     weeklySaved: t.float(),
     activeRulesCount: t.int(),
     activeGoalsCount: t.int(),
+    /// Tüm zamanların kabul edilmiş katkı toplamı (REVERSED hariç)
+    totalAcceptedContributions: t.float(),
+    /// Son 30 günde kabul edilmiş katkı toplamı
+    acceptedContributionsLast30d: t.float(),
   }),
 });
 
@@ -144,7 +153,7 @@ builder.queryField('dashboard', (t) =>
       const since7 = new Date();
       since7.setDate(since7.getDate() - 7);
 
-      const [txs30, txs7, rulesCount, goalsCount] = await Promise.all([
+      const [txs30, txs7, rulesCount, goalsCount, allContribs, contribs30] = await Promise.all([
         ctx.prisma.transaction.findMany({
           where: { userId, occurredAt: { gte: since30 } },
           select: { amount: true, opportunity: true },
@@ -155,6 +164,18 @@ builder.queryField('dashboard', (t) =>
         }),
         ctx.prisma.rule.count({ where: { userId, active: true } }),
         ctx.prisma.goal.count({ where: { userId, status: 'ACTIVE' } }),
+        ctx.prisma.microContribution.findMany({
+          where: { userId, status: { not: 'REVERSED' } },
+          select: { amount: true },
+        }),
+        ctx.prisma.microContribution.findMany({
+          where: {
+            userId,
+            status: { not: 'REVERSED' },
+            createdAt: { gte: since30 },
+          },
+          select: { amount: true },
+        }),
       ]);
 
       return {
@@ -168,6 +189,12 @@ builder.queryField('dashboard', (t) =>
         ),
         activeRulesCount: rulesCount,
         activeGoalsCount: goalsCount,
+        totalAcceptedContributions: Math.round(
+          allContribs.reduce((s, c) => s + Number(c.amount), 0),
+        ),
+        acceptedContributionsLast30d: Math.round(
+          contribs30.reduce((s, c) => s + Number(c.amount), 0),
+        ),
       };
     },
   }),

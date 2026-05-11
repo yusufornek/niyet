@@ -12,6 +12,7 @@ import './circle';
 import './score';
 import './notification';
 import './analysis';
+import './micro-contribution';
 
 import { builder } from '../builder';
 

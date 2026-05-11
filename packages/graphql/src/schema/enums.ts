@@ -5,6 +5,8 @@
 import {
   AccountType,
   CircleType,
+  ContributionSource,
+  ContributionStatus,
   GoalStatus,
   NotificationType,
   RuleFrequency,
@@ -28,6 +30,12 @@ export const AccountTypeRef = builder.enumType(AccountType, { name: 'AccountType
 export const CircleTypeRef = builder.enumType(CircleType, { name: 'CircleType' });
 export const NotificationTypeRef = builder.enumType(NotificationType, {
   name: 'NotificationType',
+});
+export const ContributionSourceRef = builder.enumType(ContributionSource, {
+  name: 'ContributionSource',
+});
+export const ContributionStatusRef = builder.enumType(ContributionStatus, {
+  name: 'ContributionStatus',
 });
 
 /** Period helper enum'u — query filter'ları için */

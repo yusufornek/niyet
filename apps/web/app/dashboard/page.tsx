@@ -23,7 +23,6 @@ import { formatTRY } from '@/lib/utils';
 export default function DashboardPage() {
   const router = useRouter();
   const paused = useApp((s) => s.paused);
-  const acceptedSavings = useApp((s) => s.acceptedSavings);
 
   const { data: me } = useMe();
   const { data: dash, isLoading: dashLoading } = useDashboard();
@@ -34,8 +33,8 @@ export default function DashboardPage() {
   const goal = goalsData?.goals[0];
   const dashboard = dash?.dashboard;
   const score = scoreData?.futureScore;
-  const acceptedShown =
-    acceptedSavings > 0 ? acceptedSavings : Math.round((dashboard?.weeklySaved ?? 0) * 4);
+  const acceptedShown = dashboard?.acceptedContributionsLast30d ?? 0;
+  const totalAccepted = dashboard?.totalAcceptedContributions ?? 0;
 
   return (
     <PhoneShell
@@ -111,6 +110,23 @@ export default function DashboardPage() {
           <div className="mt-1 text-xs opacity-60">bu ay</div>
         </Link>
       </div>
+
+      {totalAccepted > 0 && (
+        <Link href="/contributions" className="ny-card mb-3 block w-full text-left">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="ny-eyebrow">Mikro katkılar</div>
+              <div className="text-primary mt-1 text-xl font-semibold">
+                {formatTRY(totalAccepted)}
+              </div>
+              <div className="text-xs opacity-60">
+                toplam aktarıldı · son 30 gün {formatTRY(acceptedShown)}
+              </div>
+            </div>
+            <div className="text-2xl">💰</div>
+          </div>
+        </Link>
+      )}
 
       {goal && (
         <Link href="/goals" className="ny-card mb-3 block w-full text-left">

@@ -47,6 +47,40 @@ export interface DashboardStats {
   weeklySaved: number;
   activeRulesCount: number;
   activeGoalsCount: number;
+  totalAcceptedContributions: number;
+  acceptedContributionsLast30d: number;
+}
+
+export type ContributionSource =
+  | 'REDUCIBLE_TRANSACTION'
+  | 'CATEGORY_BUCKET'
+  | 'MANUAL'
+  | 'RULE_TRIGGERED';
+
+export type ContributionStatus = 'PENDING' | 'COMMITTED' | 'REVERSED';
+
+export interface MicroContribution {
+  id: string;
+  amount: number;
+  category: SpendingCategory | null;
+  source: ContributionSource;
+  status: ContributionStatus;
+  sourceRef: string | null;
+  note: string | null;
+  createdAt: string;
+  committedAt: string | null;
+  reversedAt: string | null;
+  transaction?: { id: string; merchant: string; amount: number } | null;
+  goal?: { id: string; name: string } | null;
+}
+
+export interface ContributionSummary {
+  totalAccepted: number;
+  totalCommitted: number;
+  totalPending: number;
+  count: number;
+  last30dAmount: number;
+  last30dCount: number;
 }
 
 export interface Me {
@@ -76,6 +110,7 @@ export interface Transaction {
   isRecurring: boolean;
   isReducible: boolean;
   opportunity: number | null;
+  isAccepted: boolean;
 }
 
 export interface Subscription {
@@ -181,6 +216,7 @@ const DASHBOARD_Q = `query Dashboard {
   dashboard {
     totalSpentLast30d totalOpportunityLast30d txCountLast30d weeklySaved
     activeRulesCount activeGoalsCount
+    totalAcceptedContributions acceptedContributionsLast30d
   }
 }`;
 const CATEGORY_BREAKDOWN_Q = `query CategoryBreakdown($period: Period!) {
@@ -189,8 +225,38 @@ const CATEGORY_BREAKDOWN_Q = `query CategoryBreakdown($period: Period!) {
 const TRANSACTIONS_Q = `query Transactions($period: Period, $category: SpendingCategory, $take: Int) {
   transactions(period: $period, category: $category, take: $take) {
     id amount merchant description occurredAt category categoryEdited
-    isRecurring isReducible opportunity
+    isRecurring isReducible opportunity isAccepted
   }
+}`;
+
+const MICRO_CONTRIBUTIONS_Q = `query MicroContributions($limit: Int, $statusFilter: ContributionStatus, $categoryFilter: SpendingCategory) {
+  microContributions(limit: $limit, statusFilter: $statusFilter, categoryFilter: $categoryFilter) {
+    id amount category source status sourceRef note createdAt committedAt
+    transaction { id merchant amount }
+    goal { id name }
+  }
+}`;
+
+const CONTRIBUTION_SUMMARY_Q = `query ContributionSummary {
+  contributionSummary {
+    totalAccepted totalCommitted totalPending count last30dAmount last30dCount
+  }
+}`;
+
+const ACCEPT_TX_CONTRIB_M = `mutation AcceptTxContribution($transactionId: ID!, $amount: Float, $goalId: ID, $note: String) {
+  acceptTransactionContribution(transactionId: $transactionId, amount: $amount, goalId: $goalId, note: $note) {
+    id amount status category createdAt
+  }
+}`;
+
+const ACCEPT_CATEGORY_CONTRIB_M = `mutation AcceptCategoryContribution($category: SpendingCategory!, $goalId: ID) {
+  acceptCategoryContribution(category: $category, goalId: $goalId) {
+    id amount status category createdAt
+  }
+}`;
+
+const REVERSE_CONTRIB_M = `mutation ReverseContribution($id: ID!) {
+  reverseContribution(id: $id) { id status reversedAt }
 }`;
 const SUBSCRIPTIONS_Q = `query Subscriptions {
   subscriptions { id name amount frequency status detectedAt merchantPattern }
@@ -344,6 +410,35 @@ export const useCircles = () =>
     staleTime: 60_000,
   });
 
+export const useMicroContributions = (
+  options: {
+    limit?: number;
+    statusFilter?: ContributionStatus;
+    categoryFilter?: SpendingCategory;
+  } = {},
+) =>
+  useQuery({
+    queryKey: ['microContributions', options],
+    queryFn: () =>
+      gqlFetcher<
+        { microContributions: MicroContribution[] },
+        { limit: number; statusFilter?: ContributionStatus; categoryFilter?: SpendingCategory }
+      >(MICRO_CONTRIBUTIONS_Q, {
+        limit: options.limit ?? 50,
+        statusFilter: options.statusFilter,
+        categoryFilter: options.categoryFilter,
+      }),
+    staleTime: 30_000,
+  });
+
+export const useContributionSummary = () =>
+  useQuery({
+    queryKey: ['contributionSummary'],
+    queryFn: () =>
+      gqlFetcher<{ contributionSummary: ContributionSummary }, undefined>(CONTRIBUTION_SUMMARY_Q),
+    staleTime: 30_000,
+  });
+
 // ─────────────────────────────────────────────────────────────
 // Mutations
 // ─────────────────────────────────────────────────────────────
@@ -466,5 +561,71 @@ export function useMarkNotificationRead() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['notifications'] });
     },
+  });
+}
+
+/** Tüm contribution-related query'leri yenile (tek yerden DRY) */
+function invalidateContributionQueries(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['microContributions'] });
+  void qc.invalidateQueries({ queryKey: ['contributionSummary'] });
+  void qc.invalidateQueries({ queryKey: ['transactions'] });
+  void qc.invalidateQueries({ queryKey: ['categoryBreakdown'] });
+  void qc.invalidateQueries({ queryKey: ['dashboard'] });
+}
+
+export function useAcceptTransactionContribution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      transactionId: string;
+      amount?: number;
+      goalId?: string;
+      note?: string;
+    }) =>
+      gqlFetcher<
+        { acceptTransactionContribution: MicroContribution },
+        { transactionId: string; amount?: number; goalId?: string; note?: string }
+      >(ACCEPT_TX_CONTRIB_M, vars),
+    onSuccess: (data) => {
+      invalidateContributionQueries(qc);
+      toast.success(
+        `+${Math.round(data.acceptTransactionContribution.amount)} ₺ katkıya dönüştürüldü`,
+      );
+    },
+    onError: (e: Error) => toast.error('Katkıya dönüştürülemedi', { description: e.message }),
+  });
+}
+
+export function useAcceptCategoryContribution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { category: SpendingCategory; goalId?: string }) =>
+      gqlFetcher<
+        { acceptCategoryContribution: MicroContribution },
+        { category: SpendingCategory; goalId?: string }
+      >(ACCEPT_CATEGORY_CONTRIB_M, vars),
+    onSuccess: (data) => {
+      invalidateContributionQueries(qc);
+      toast.success(
+        `+${Math.round(data.acceptCategoryContribution.amount)} ₺ toplu katkıya dönüştürüldü`,
+      );
+    },
+    onError: (e: Error) => toast.error('Toplu katkı yapılamadı', { description: e.message }),
+  });
+}
+
+export function useReverseContribution() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<
+        { reverseContribution: { id: string; status: ContributionStatus } },
+        { id: string }
+      >(REVERSE_CONTRIB_M, { id }),
+    onSuccess: () => {
+      invalidateContributionQueries(qc);
+      toast.success('Katkı geri alındı');
+    },
+    onError: () => toast.error('Geri alınamadı'),
   });
 }

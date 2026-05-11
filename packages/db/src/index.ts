@@ -37,6 +37,7 @@ export {
   type Notification,
   type AnalysisRun,
   type TransactionAnalysis,
+  type MicroContribution,
   SpendingCategory,
   SubscriptionStatus,
   GoalStatus,
@@ -44,4 +45,6 @@ export {
   AccountType,
   CircleType,
   NotificationType,
+  ContributionSource,
+  ContributionStatus,
 } from '@prisma/client';
