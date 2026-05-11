@@ -41,6 +41,8 @@ export {
   type AnalysisRun,
   type TransactionAnalysis,
   type MicroContribution,
+  type ChatSession,
+  type ChatMessage,
   SpendingCategory,
   SubscriptionStatus,
   GoalStatus,
@@ -50,4 +52,5 @@ export {
   NotificationType,
   ContributionSource,
   ContributionStatus,
+  ChatRole,
 } from '@prisma/client';

@@ -130,6 +130,7 @@ model User {
   futureScores        FutureScoreSnapshot[]
   analysisRuns        AnalysisRun[]
   microContributions  MicroContribution[]
+  chatSessions        ChatSession[]
 
   @@index([authId])
 }
@@ -355,6 +356,53 @@ model CircleMembership {
 
   @@unique([circleId, userId])
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI Chat Sessions (Pattern B — AI Saving Coach multi-turn agent)
+// ─────────────────────────────────────────────────────────────
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+model ChatSession {
+  id          String   @id @default(cuid())
+  userId      String
+  /// İlk user mesajından otomatik üretilen kısa başlık
+  title       String?
+  /// Hedef context (varsa) — "Bu hedef için sohbet"
+  goalContext String?
+  geminiModel String
+  totalTokens Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id        String    @id @default(cuid())
+  sessionId String
+  role      ChatRole
+  /// USER: kullanıcı metni. ASSISTANT: Gemini cevabı. TOOL: function result.
+  content   String
+  /// Function call yapıldıysa hangi tool (set_category, recommend_subscription_to_cancel, vs.)
+  toolName  String?
+  /// Tool arg veya result JSON
+  toolPayload Json?
+  /// Bu mesaj için Gemini'nin harcadığı token sayısı (ASSISTANT için)
+  tokensUsed Int?
+  createdAt DateTime  @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }
 
 // ─────────────────────────────────────────────────────────────

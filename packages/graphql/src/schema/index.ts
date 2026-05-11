@@ -13,6 +13,7 @@ import './score';
 import './notification';
 import './analysis';
 import './micro-contribution';
+import './chat';
 
 import { builder } from '../builder';
 
