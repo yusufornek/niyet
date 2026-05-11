@@ -1,6 +1,7 @@
 /**
- * @niyet/graphql — Pothos + Yoga GraphQL layer.
- *
- * Faz 4'te doldurulacak. Şu an placeholder; import çalışması için.
+ * @niyet/graphql — Public exports.
  */
-export const GRAPHQL_PACKAGE_VERSION = '0.0.1';
+export { schema } from './schema';
+export { builder } from './builder';
+export { createContext } from './context';
+export type { GraphQLContext } from './context';

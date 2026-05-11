@@ -16,8 +16,24 @@
     "test": "echo 'graphql: test (placeholder)'",
     "schema:export": "echo 'TODO: export schema.graphql'"
   },
+  "dependencies": {
+    "@niyet/core": "workspace:*",
+    "@niyet/db": "workspace:*",
+    "@pothos/core": "^4.4.0",
+    "@pothos/plugin-prisma": "^4.4.0",
+    "@pothos/plugin-scope-auth": "^4.1.0",
+    "@pothos/plugin-simple-objects": "^4.1.0",
+    "graphql": "^16.10.0",
+    "graphql-scalars": "^1.24.0",
+    "graphql-yoga": "^5.10.0"
+  },
+  "peerDependencies": {
+    "@prisma/client": "^6.2.1"
+  },
   "devDependencies": {
     "@niyet/tsconfig": "workspace:*",
+    "@prisma/client": "^6.2.1",
+    "prisma": "^6.2.1",
     "typescript": "^5.7.2"
   }
 }
