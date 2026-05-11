@@ -10,10 +10,13 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// NOTE: 'query' log dev'de her query'yi stdout'a yazar — Supabase pooler ile
+// 200+ tx aggregate query'lerinde her satır yavaşlatır. Sadece error+warn yeterli.
+// Query inspeksiyonu için `DEBUG_PRISMA_QUERIES=1` env aç.
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: process.env.DEBUG_PRISMA_QUERIES === '1' ? ['query', 'error', 'warn'] : ['error', 'warn'],
   });
 
 if (process.env.NODE_ENV !== 'production') {
