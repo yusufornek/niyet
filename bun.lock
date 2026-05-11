@@ -229,6 +229,7 @@
       "devDependencies": {
         "@niyet/tsconfig": "workspace:*",
         "typescript": "^5.7.2",
+        "vitest": "^2.1.8",
       },
     },
     "packages/db": {

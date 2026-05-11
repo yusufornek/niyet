@@ -14,13 +14,15 @@
     "build": "tsc",
     "lint": "echo 'core: lint (placeholder)'",
     "type-check": "tsc --noEmit",
-    "test": "echo 'core: test (placeholder)'"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@niyet/tsconfig": "workspace:*",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }

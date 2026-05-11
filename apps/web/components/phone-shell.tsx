@@ -19,7 +19,7 @@ type Props = {
 
 /**
  * iPhone-style mobil ekran çerçevesi. Tarayıcıda mobil deneyimi simüle eder.
- * Jüri demosunda "bu mobil ürün" hissini browser'da verir.
+ * Mobile-first responsive: sm ve üstünde iPhone çerçevesi, altında full-bleed.
  */
 export function PhoneShell({
   title,

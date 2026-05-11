@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "echo 'web: tests planned for Faz 8'",
+    "test": "echo 'web: unit tests planned for Faz 9'",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
