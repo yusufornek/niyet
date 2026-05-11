@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { PhoneShell } from '@/components/phone-shell';
 import {
@@ -21,6 +22,7 @@ const CATEGORY_LABEL: Record<string, { label: string; icon: string }> = {
 };
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const notificationsEnabled = useApp((s) => s.notificationsEnabled);
   const toggleNotifications = useApp((s) => s.toggleNotifications);
   const thresholds = useApp((s) => s.thresholds);
@@ -70,19 +72,38 @@ export default function NotificationsPage() {
         <p className="ny-tagline mb-5">Henüz bildirim yok.</p>
       ) : (
         <div className="mb-5 space-y-3">
-          {items.map((i) => (
-            <button
-              key={i.id}
-              onClick={() => !i.read && markRead.mutate(i.id)}
-              className={`ny-card w-full text-left ${i.read ? 'opacity-60' : ''}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="font-semibold">{i.title}</div>
-                {!i.read && <span className="bg-primary mt-1.5 h-2 w-2 shrink-0 rounded-full" />}
-              </div>
-              <div className="mt-1 text-sm opacity-70">{i.body}</div>
-            </button>
-          ))}
+          {items.map((i) => {
+            const targetHref =
+              i.type === 'ANALYSIS_COMPLETE' || i.type === 'AI_INSIGHT'
+                ? '/history'
+                : i.type === 'CONTRIBUTION_ACCEPTED'
+                  ? '/contributions'
+                  : i.type === 'GOAL_MILESTONE'
+                    ? '/goals'
+                    : i.type === 'RULE_TRIGGERED'
+                      ? '/rule'
+                      : null;
+            const handleClick = () => {
+              if (!i.read) markRead.mutate(i.id);
+              if (targetHref) router.push(targetHref);
+            };
+            return (
+              <button
+                key={i.id}
+                onClick={handleClick}
+                className={`ny-card w-full text-left ${i.read ? 'opacity-60' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="font-semibold">{i.title}</div>
+                  {!i.read && <span className="bg-primary mt-1.5 h-2 w-2 shrink-0 rounded-full" />}
+                </div>
+                <div className="mt-1 text-sm opacity-70">{i.body}</div>
+                {targetHref && (
+                  <div className="text-primary mt-2 text-xs font-semibold">İncele →</div>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 

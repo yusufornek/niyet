@@ -1,6 +1,7 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { PhoneShell } from '@/components/phone-shell';
@@ -103,13 +104,19 @@ export default function AnalysisDetailPage() {
 
       {sortedCategories.length > 0 && (
         <>
-          <div className="ny-eyebrow mb-2">En yüksek fırsatlar (kategori)</div>
+          <div className="ny-eyebrow mb-2">
+            En yüksek fırsatlar (kategoriye tıkla, katkıya dönüştür)
+          </div>
           <div className="mb-4 space-y-2">
             {sortedCategories.map(([cat, total]) => {
               const meta = CATEGORY_META[cat];
               const pct = run.totalOpportunity > 0 ? (total / run.totalOpportunity) * 100 : 0;
               return (
-                <div key={cat} className="ny-card !p-3">
+                <Link
+                  key={cat}
+                  href={`/category/${cat}`}
+                  className="ny-card hover:border-primary/40 block !p-3"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{meta?.icon}</span>
@@ -120,7 +127,7 @@ export default function AnalysisDetailPage() {
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[hsl(var(--divider-soft))]">
                     <div className="bg-primary h-full" style={{ width: `${pct}%` }} />
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

@@ -37,7 +37,8 @@ export type NotificationType =
   | 'GOAL_MILESTONE'
   | 'AI_INSIGHT'
   | 'ANALYSIS_COMPLETE'
-  | 'RULE_TRIGGERED';
+  | 'RULE_TRIGGERED'
+  | 'CONTRIBUTION_ACCEPTED';
 export type Period = 'LAST_7D' | 'LAST_30D' | 'LAST_90D' | 'ALL';
 
 export interface DashboardStats {

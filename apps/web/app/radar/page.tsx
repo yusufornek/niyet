@@ -291,9 +291,14 @@ export default function RadarPage() {
             })}
           </div>
 
-          <Link href="/history" className="text-primary mt-5 block w-full text-center text-sm">
-            Geçmiş analizleri gör →
-          </Link>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <Link href="/contributions" className="ny-pill-ghost text-center text-sm">
+              Katkılarım →
+            </Link>
+            <Link href="/history" className="ny-pill-ghost text-center text-sm">
+              Analiz geçmişi →
+            </Link>
+          </div>
         </>
       )}
     </PhoneShell>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Sparkles, Undo2 } from 'lucide-react';
+import Link from 'next/link';
 
 import { PhoneShell } from '@/components/phone-shell';
 import {
@@ -86,6 +87,9 @@ export default function ContributionsPage() {
           <p className="mt-2 text-xs opacity-60">
             Tasarruf Radarı&apos;ndan azaltılabilir bir harcamayı katkıya dönüştürerek başla.
           </p>
+          <Link href="/radar" className="ny-pill mt-4 inline-block">
+            Radarı aç
+          </Link>
         </div>
       ) : (
         <div className="space-y-2">

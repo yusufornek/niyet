@@ -5,6 +5,7 @@ import {
   GraduationCap,
   History as HistoryIcon,
   Pause,
+  PiggyBank,
   Settings,
   TrendingUp,
   Users,
@@ -111,22 +112,42 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {totalAccepted > 0 && (
-        <Link href="/contributions" className="ny-card mb-3 block w-full text-left">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="ny-eyebrow">Mikro katkılar</div>
-              <div className="text-primary mt-1 text-xl font-semibold">
-                {formatTRY(totalAccepted)}
-              </div>
-              <div className="text-xs opacity-60">
-                toplam aktarıldı · son 30 gün {formatTRY(acceptedShown)}
-              </div>
-            </div>
-            <div className="text-2xl">💰</div>
+      <Link href="/contributions" className="ny-card mb-3 block w-full text-left">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="ny-eyebrow">Mikro emeklilik katkıları</div>
+            {totalAccepted > 0 ? (
+              <>
+                <div className="text-primary mt-1 text-xl font-semibold">
+                  {formatTRY(totalAccepted)}
+                </div>
+                <div className="text-xs opacity-60">
+                  toplam aktarıldı · son 30 gün {formatTRY(acceptedShown)}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mt-1 text-sm font-semibold">İlk katkını yap</div>
+                <div className="text-xs opacity-60">
+                  Tasarruf Radarı&apos;ndan azaltılabilir bir harcamayı emekliliğine aktar
+                </div>
+              </>
+            )}
           </div>
-        </Link>
-      )}
+          <div className="text-2xl">💰</div>
+        </div>
+      </Link>
+
+      <Link href="/history" className="ny-card mb-3 block w-full text-left">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="ny-eyebrow">AI Analiz Geçmişi</div>
+            <div className="mt-1 text-sm font-semibold">Tasarruf fırsatlarını incele</div>
+            <div className="text-xs opacity-60">Trend, kategori grup ve karar geçmişi</div>
+          </div>
+          <div className="text-2xl">📈</div>
+        </div>
+      </Link>
 
       {goal && (
         <Link href="/goals" className="ny-card mb-3 block w-full text-left">
@@ -153,12 +174,14 @@ export default function DashboardPage() {
 
       <div className="ny-eyebrow mb-2 mt-5">Hızlı erişim</div>
       <div className="mb-3 grid grid-cols-3 gap-3">
-        <QuickTile icon={<Pause size={18} />} label="Nefes ayı" href="/pause" />
-        <QuickTile icon={<Users size={18} />} label="Çemberler" href="/circles" />
-        <QuickTile icon={<HistoryIcon size={18} />} label="Geçmiş" href="/history" />
+        <QuickTile icon={<PiggyBank size={18} />} label="Katkılar" href="/contributions" />
+        <QuickTile icon={<HistoryIcon size={18} />} label="Analizler" href="/history" />
         <QuickTile icon={<CreditCard size={18} />} label="Abonelik" href="/subscriptions" />
+        <QuickTile icon={<Users size={18} />} label="Çemberler" href="/circles" />
+        <QuickTile icon={<Pause size={18} />} label="Nefes ayı" href="/pause" />
         <QuickTile icon={<GraduationCap size={18} />} label="Öğren" href="/learn" />
         <QuickTile icon={<TrendingUp size={18} />} label="Fonlar" href="/funds" />
+        <QuickTile icon={<Settings size={18} />} label="Ayarlar" href="/settings" />
       </div>
 
       <div className="ny-card mb-3">
