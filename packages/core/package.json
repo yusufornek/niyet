@@ -11,9 +11,16 @@
     "./constants": "./src/constants.ts"
   },
   "scripts": {
-    "build": "echo 'core: build (placeholder)'",
+    "build": "tsc",
     "lint": "echo 'core: lint (placeholder)'",
-    "type-check": "echo 'core: type-check (placeholder)'",
+    "type-check": "tsc --noEmit",
     "test": "echo 'core: test (placeholder)'"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@niyet/tsconfig": "workspace:*",
+    "typescript": "^5.7.2"
   }
 }

@@ -42,12 +42,12 @@
     "bun": ">=1.1"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "*.{json,md,css}": [
+    "*.{ts,tsx,js,jsx,json,md,css}": [
       "prettier --write"
     ]
-  }
+  },
+  "trustedDependencies": [
+    "@swc/core",
+    "unrs-resolver"
+  ]
 }

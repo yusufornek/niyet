@@ -1,0 +1,208 @@
+/* Adapted from Uiverse.io by Praashoo7 — Niyet score card */
+.score-stage {
+  position: relative;
+  width: 100%;
+  margin-bottom: 12px;
+  height: 170px;
+  transition: height 0.4s ease;
+}
+.score-stage:has(.score-card:hover),
+.score-stage.is-open {
+  height: 340px;
+}
+
+.score-cardm {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  height: 100%;
+}
+
+/* Front card */
+.score-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  border-radius: 24px;
+  background: hsl(var(--canvas));
+  color: hsl(var(--ink));
+  border: 1px solid hsl(var(--hairline));
+  z-index: 2;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease,
+    background 0.35s ease;
+  box-shadow: 0 4px 14px -8px rgba(0, 0, 0, 0.12);
+}
+.score-card:hover {
+  background: linear-gradient(135deg, hsl(var(--canvas)) 0%, hsl(var(--primary) / 0.1) 100%);
+  box-shadow: 0 14px 30px -14px hsl(var(--primary) / 0.45);
+}
+
+.score-card .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--ink-muted-48));
+  font-weight: 600;
+}
+
+.score-ring {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+}
+.score-ring-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.score-ring-num b {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+.score-ring-num span {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 2px;
+}
+
+.score-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 6px;
+  letter-spacing: -0.3px;
+}
+.score-card-sub {
+  font-size: 12px;
+  color: hsl(var(--ink-muted-80));
+  margin-top: 4px;
+  max-width: 200px;
+}
+.score-delta {
+  position: absolute;
+  bottom: 14px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.score-cta {
+  position: absolute;
+  bottom: 14px;
+  right: 20px;
+  font-size: 12px;
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+/* Back card */
+.score-card2 {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  height: 150px;
+  border-radius: 24px;
+  background: hsl(var(--surface-pearl));
+  border: 1px solid hsl(var(--hairline));
+  z-index: 1;
+  overflow: hidden;
+  transition:
+    height 0.4s ease,
+    top 0.4s ease;
+}
+
+.score-stage:has(.score-card:hover) .score-card2,
+.score-stage.is-open .score-card2 {
+  top: 0;
+  height: 340px;
+}
+
+.score-card2-inner {
+  position: absolute;
+  top: 160px;
+  left: 0;
+  right: 0;
+  bottom: 36px;
+  padding: 14px 20px;
+  opacity: 0;
+  transition: opacity 0.35s ease 0.15s;
+  overflow-y: auto;
+}
+.score-stage:has(.score-card:hover) .score-card2-inner,
+.score-stage.is-open .score-card2-inner {
+  opacity: 1;
+}
+
+.score-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+}
+.score-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: hsl(var(--ink-muted-48));
+  font-weight: 600;
+}
+.score-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 2px;
+  letter-spacing: -0.2px;
+}
+.score-stat-foot {
+  font-size: 11px;
+  color: hsl(var(--ink-muted-80));
+  margin-top: 1px;
+}
+
+.score-status-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary));
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
+}
+.score-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: hsl(var(--primary-foreground));
+  opacity: 0.9;
+}
+
+/* Touch / no-hover devices: tap to toggle via .is-open class */
+@media (hover: none) {
+  .score-card {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

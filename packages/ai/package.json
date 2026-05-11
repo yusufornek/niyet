@@ -11,10 +11,14 @@
     "./prompts": "./src/prompts/index.ts"
   },
   "scripts": {
-    "build": "echo 'ai: build (placeholder)'",
+    "build": "tsc",
     "lint": "echo 'ai: lint (placeholder)'",
     "type-check": "tsc --noEmit",
     "test": "echo 'ai: test (placeholder)'",
     "eval": "echo 'TODO: eval suite (Faz 5/8)'"
+  },
+  "devDependencies": {
+    "@niyet/tsconfig": "workspace:*",
+    "typescript": "^5.7.2"
   }
 }

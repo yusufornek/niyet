@@ -1,0 +1,358 @@
+// Niyet — Tek kaynak Prisma schema
+// Detaylı domain modeli: ARCHITECTURE.md §6, plan dosyası §6
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enum'lar
+// ─────────────────────────────────────────────────────────────
+
+/// 15 sabit Türkçe harcama kategorisi (ADR-007).
+enum SpendingCategory {
+  MARKET
+  FOOD_DELIVERY
+  COFFEE
+  DINING_OUT
+  TRANSPORT
+  FUEL
+  BILLS
+  SUBSCRIPTIONS
+  ONLINE_SHOPPING
+  CLOTHING
+  HEALTH
+  ENTERTAINMENT
+  EDUCATION
+  SPORTS
+  OTHER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLABLE
+  CANCELED
+}
+
+enum GoalStatus {
+  ACTIVE
+  PAUSED
+  ACHIEVED
+}
+
+enum RuleFrequency {
+  WEEKLY
+  MONTHLY
+  PAYDAY
+  ONE_TIME
+}
+
+enum AccountType {
+  CREDIT_CARD
+  DEBIT
+  CHECKING
+  SAVINGS
+}
+
+enum CircleType {
+  FAMILY
+  COMMUNITY
+}
+
+enum NotificationType {
+  SPENDING_ALERT
+  GOAL_MILESTONE
+  AI_INSIGHT
+  ANALYSIS_COMPLETE
+  RULE_TRIGGERED
+}
+
+// ─────────────────────────────────────────────────────────────
+// Çekirdek modeller
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  /// Supabase Auth user id (auth.users.id ile aynı). RLS policies bunu kullanır.
+  authId        String?  @unique
+  email         String   @unique
+  name          String
+  age           Int
+  monthlyIncome Decimal  @db.Money
+  consentAcceptedAt DateTime?
+  consentVersion    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  accounts        Account[]
+  bankConnections BankConnection[]
+  transactions    Transaction[]
+  subscriptions   Subscription[]
+  goals           Goal[]
+  rules           Rule[]
+  circleMemberships CircleMembership[]
+  notifications   Notification[]
+  futureScores    FutureScoreSnapshot[]
+  analysisRuns    AnalysisRun[]
+
+  @@index([authId])
+}
+
+model BankConnection {
+  id          String   @id @default(cuid())
+  userId      String
+  /// "Garanti BBVA", "İş Bankası", "Akbank", "Yapı Kredi", "Ziraat"
+  bankName    String
+  connectedAt DateTime @default(now())
+  disconnectedAt DateTime?
+  active      Boolean  @default(true)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts Account[]
+
+  @@index([userId, active])
+}
+
+model Account {
+  id          String      @id @default(cuid())
+  userId      String
+  bankConnId  String
+  type        AccountType
+  /// Son 4 rakam (gerçek kart no asla saklanmaz)
+  last4       String
+  /// Hesap takma adı: "Maaş hesabı", "Birikim", vs.
+  nickname    String?
+  balance     Decimal     @db.Money
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankConn     BankConnection   @relation(fields: [bankConnId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id             String           @id @default(cuid())
+  userId         String
+  accountId      String
+  amount         Decimal          @db.Money
+  /// Merchant adı: "Starbucks", "Migros", "Netflix"
+  merchant       String
+  description    String?
+  occurredAt     DateTime
+  category       SpendingCategory
+  /// Kullanıcı kategoriyi düzelttiyse true (feedback signal)
+  categoryEdited Boolean          @default(false)
+  /// AI abonelik tespit ettiyse
+  isRecurring    Boolean          @default(false)
+  /// AI azaltılabilir işaretlediyse
+  isReducible    Boolean          @default(false)
+  /// Tasarruf fırsatı tutarı (varsa)
+  opportunity    Decimal?         @db.Money
+  /// Ham banka verisi (mock için JSON)
+  rawData        Json?
+
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account             Account               @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactionAnalyses TransactionAnalysis[]
+
+  @@index([userId, occurredAt])
+  @@index([userId, category])
+  @@index([userId, isReducible])
+}
+
+model Subscription {
+  id            String              @id @default(cuid())
+  userId        String
+  name          String
+  amount        Decimal             @db.Money
+  frequency     RuleFrequency
+  status        SubscriptionStatus  @default(ACTIVE)
+  detectedAt    DateTime            @default(now())
+  lastChargedAt DateTime?
+  /// İlişkili merchant pattern (kullanıcı 'Netflix' tx'lerini takip etmek için)
+  merchantPattern String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI & Analiz
+// ─────────────────────────────────────────────────────────────
+
+model AnalysisRun {
+  id                String   @id @default(cuid())
+  userId            String
+  triggeredAt       DateTime @default(now())
+  /// "gemini-2.5-flash", "gemini-1.5-pro", ...
+  geminiModel       String
+  /// Full request payload (transparency için saklanır)
+  request           Json
+  /// Full response (tool calls dahil)
+  response          Json
+  durationMs        Int
+  totalTransactions Int
+  totalOpportunity  Decimal  @db.Money
+  /// Gemini'den dönen toplam token (prompt + completion)
+  totalTokens       Int?
+  /// Hata varsa
+  error             String?
+
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionAnalyses TransactionAnalysis[]
+
+  @@index([userId, triggeredAt])
+}
+
+model TransactionAnalysis {
+  id            String           @id @default(cuid())
+  runId         String
+  transactionId String
+
+  suggestedCategory  SpendingCategory?
+  markedSubscription Boolean           @default(false)
+  reducibleAmount    Decimal?          @db.Money
+  /// Gemini'nin açıklaması (kullanıcıya transparency için)
+  reasoning          String?
+
+  run         AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([transactionId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Hedef & Birikim
+// ─────────────────────────────────────────────────────────────
+
+model Goal {
+  id                  String     @id @default(cuid())
+  userId              String
+  /// "Yeni laptop", "Ev peşinatı", "Emeklilik birikimi"
+  name                String
+  basePrice           Decimal    @db.Money
+  currentPrice        Decimal    @db.Money
+  inflationPct        Decimal    @db.Decimal(5, 2)
+  targetDate          DateTime
+  current             Decimal    @default(0) @db.Money
+  monthlyContribution Decimal    @db.Money
+  status              GoalStatus @default(ACTIVE)
+  /// [{ date, price }] formatında price tracking
+  priceHistory        Json?
+  /// Goal Forecasting Agent (Pattern C) için context
+  coachContext        String?
+  autoUpdate          Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkpoints GoalCheckpoint[]
+
+  @@index([userId, status])
+}
+
+model GoalCheckpoint {
+  id        String    @id @default(cuid())
+  goalId    String
+  /// 10, 25, 50, 75
+  percent   Int
+  label     String
+  reached   Boolean   @default(false)
+  reachedAt DateTime?
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, percent])
+}
+
+model Rule {
+  id        String        @id @default(cuid())
+  userId    String
+  /// "Haftalık mikro katkı", "Maaş günü katkısı"
+  label     String
+  amount    Decimal       @db.Money
+  frequency RuleFrequency
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sosyal (Çemberler)
+// ─────────────────────────────────────────────────────────────
+
+model Circle {
+  id        String     @id @default(cuid())
+  name      String
+  target    Decimal    @db.Money
+  type      CircleType
+  /// Topluluk çemberi public mi? false ise davet ile katılım
+  isPublic  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+
+  members CircleMembership[]
+}
+
+model CircleMembership {
+  id           String   @id @default(cuid())
+  circleId     String
+  userId       String
+  contribution Decimal  @default(0) @db.Money
+  joinedAt     DateTime @default(now())
+  /// 'admin' veya 'member'
+  role         String   @default("member")
+
+  circle Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, userId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Engagement (Future Score & Notifications)
+// ─────────────────────────────────────────────────────────────
+
+model FutureScoreSnapshot {
+  id           String   @id @default(cuid())
+  userId       String
+  /// 0-100 toplam skor
+  score        Int
+  contribution Int
+  discipline   Int
+  consistency  Int
+  social       Int
+  computedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, computedAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  read      Boolean          @default(false)
+  /// İlgili entity (transaction, goal, vs.) referansı
+  payload   Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+}

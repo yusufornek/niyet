@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Niyet — Apple-inspired design tokens */
+    --background: 0 0% 100%;
+    --foreground: 240 6% 12%;
+
+    --canvas: 0 0% 100%;
+    --canvas-parchment: 240 14% 96%;
+    --surface-pearl: 240 20% 99%;
+
+    --tile-1: 240 4% 16%;
+    --tile-2: 240 3% 17%;
+    --tile-3: 240 4% 15%;
+    --surface-black: 0 0% 0%;
+
+    --ink: 240 6% 12%;
+    --ink-muted-80: 0 0% 20%;
+    --ink-muted-48: 0 0% 48%;
+    --body-on-dark: 0 0% 100%;
+    --body-muted-dark: 0 0% 80%;
+
+    --hairline: 0 0% 88%;
+    --divider-soft: 0 0% 94%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 12%;
+
+    --primary: 211 100% 40%; /* Action Blue #0066cc */
+    --primary-foreground: 0 0% 100%;
+    --primary-focus: 211 100% 45%;
+    --primary-on-dark: 209 100% 58%; /* Sky Link */
+
+    --secondary: 240 14% 96%;
+    --secondary-foreground: 240 6% 12%;
+    --muted: 240 14% 96%;
+    --muted-foreground: 0 0% 48%;
+    --accent: 240 14% 96%;
+    --accent-foreground: 240 6% 12%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 211 100% 45%;
+
+    --radius: 0.5rem;
+
+    --shadow-product: 3px 5px 30px 0 rgba(0, 0, 0, 0.22);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    @apply text-foreground bg-[hsl(var(--canvas-parchment))];
+    font-family:
+      'SF Pro Text',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Inter',
+      system-ui,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family:
+      'SF Pro Display',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Inter',
+      system-ui,
+      sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .ny-display {
+    font-weight: 600;
+    letter-spacing: -0.374px;
+  }
+  .ny-tight {
+    letter-spacing: -0.28px;
+  }
+  .ny-pill {
+    @apply bg-primary text-primary-foreground inline-flex items-center justify-center rounded-full;
+    padding: 11px 22px;
+    font-size: 17px;
+    line-height: 1;
+    transition: transform 0.15s ease;
+  }
+  .ny-pill:active {
+    transform: scale(0.95);
+  }
+  .ny-pill-ghost {
+    @apply border-primary text-primary inline-flex items-center justify-center rounded-full border bg-transparent;
+    padding: 11px 22px;
+    font-size: 17px;
+    line-height: 1;
+    transition: transform 0.15s ease;
+  }
+  .ny-pill-ghost:active {
+    transform: scale(0.95);
+  }
+  .ny-pill-sm {
+    @apply bg-primary text-primary-foreground inline-flex items-center justify-center rounded-full;
+    padding: 8px 16px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .ny-card {
+    @apply rounded-[18px] border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas))];
+    padding: 20px;
+  }
+  .ny-tile-dark {
+    @apply rounded-[18px] bg-[hsl(var(--tile-1))] text-[hsl(var(--body-on-dark))];
+    padding: 24px;
+  }
+  .ny-chip {
+    @apply inline-flex items-center rounded-full border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas))];
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .ny-h1 {
+    font-size: 34px;
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+  .ny-h2 {
+    font-size: 24px;
+    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -0.374px;
+  }
+  .ny-tagline {
+    font-size: 17px;
+    color: hsl(var(--ink-muted-80));
+    line-height: 1.4;
+  }
+  .ny-eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: hsl(var(--ink-muted-48));
+    font-weight: 600;
+  }
+}

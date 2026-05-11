@@ -1,0 +1,10 @@
+{
+  "extends": "@niyet/tsconfig/library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "composite": true
+  },
+  "include": ["src/**/*", "prisma/seed.ts"],
+  "exclude": ["dist", "node_modules", "prisma/migrations"]
+}

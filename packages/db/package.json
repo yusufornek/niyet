@@ -9,16 +9,28 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "generate": "prisma generate",
-    "migrate": "prisma migrate dev",
-    "migrate:prod": "prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts",
-    "reset": "prisma migrate reset --force && bun run seed",
-    "studio": "prisma studio",
+    "generate": "dotenv -e ../../.env.local -- prisma generate",
+    "migrate": "dotenv -e ../../.env.local -- prisma migrate dev",
+    "migrate:prod": "dotenv -e ../../.env.local -- prisma migrate deploy",
+    "db:push": "dotenv -e ../../.env.local -- prisma db push",
+    "seed": "dotenv -e ../../.env.local -- tsx prisma/seed.ts",
+    "reset": "dotenv -e ../../.env.local -- prisma migrate reset --force",
+    "studio": "dotenv -e ../../.env.local -- prisma studio",
     "build": "echo 'db: no build needed'",
     "lint": "echo 'db: lint (placeholder)'",
     "type-check": "tsc --noEmit",
     "test": "echo 'db: test (placeholder)'"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.1"
+  },
+  "devDependencies": {
+    "@niyet/tsconfig": "workspace:*",
+    "@types/node": "^22.10.0",
+    "dotenv-cli": "^8.0.0",
+    "prisma": "^6.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",

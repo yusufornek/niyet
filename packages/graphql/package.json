@@ -10,10 +10,14 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "build": "echo 'graphql: build (placeholder)'",
+    "build": "tsc",
     "lint": "echo 'graphql: lint (placeholder)'",
     "type-check": "tsc --noEmit",
     "test": "echo 'graphql: test (placeholder)'",
     "schema:export": "echo 'TODO: export schema.graphql'"
+  },
+  "devDependencies": {
+    "@niyet/tsconfig": "workspace:*",
+    "typescript": "^5.7.2"
   }
 }
