@@ -122,6 +122,17 @@ export interface Subscription {
   status: SubscriptionStatus;
   detectedAt: string;
   merchantPattern: string | null;
+  yearlyAmount: number;
+}
+
+export interface SubscriptionSummaryData {
+  activeCount: number;
+  cancellableCount: number;
+  canceledCount: number;
+  activeMonthlyTotal: number;
+  activeYearlyTotal: number;
+  potentialMonthlySavings: number;
+  potentialYearlySavings: number;
 }
 
 export interface GoalCheckpoint {
@@ -260,7 +271,22 @@ const REVERSE_CONTRIB_M = `mutation ReverseContribution($id: ID!) {
   reverseContribution(id: $id) { id status reversedAt }
 }`;
 const SUBSCRIPTIONS_Q = `query Subscriptions {
-  subscriptions { id name amount frequency status detectedAt merchantPattern }
+  subscriptions { id name amount frequency status detectedAt merchantPattern yearlyAmount }
+}`;
+const SUBSCRIPTION_SUMMARY_Q = `query SubscriptionSummary {
+  subscriptionSummary {
+    activeCount cancellableCount canceledCount
+    activeMonthlyTotal activeYearlyTotal
+    potentialMonthlySavings potentialYearlySavings
+  }
+}`;
+const MARK_SUB_STATUS_M = `mutation MarkSubscriptionStatus($id: ID!, $status: SubscriptionStatus!) {
+  markSubscriptionStatus(id: $id, status: $status) { id status }
+}`;
+const CANCEL_SUB_M = `mutation CancelSubscription($id: ID!, $contributionAmount: Float) {
+  cancelSubscription(id: $id, contributionAmount: $contributionAmount) {
+    id name status yearlyAmount
+  }
 }`;
 const GOALS_Q = `query Goals {
   goals {
@@ -349,6 +375,16 @@ export const useSubscriptions = () =>
     queryKey: ['subscriptions'],
     queryFn: () => gqlFetcher<{ subscriptions: Subscription[] }, undefined>(SUBSCRIPTIONS_Q),
     staleTime: 60_000,
+  });
+
+export const useSubscriptionSummary = () =>
+  useQuery({
+    queryKey: ['subscriptionSummary'],
+    queryFn: () =>
+      gqlFetcher<{ subscriptionSummary: SubscriptionSummaryData }, undefined>(
+        SUBSCRIPTION_SUMMARY_Q,
+      ),
+    staleTime: 30_000,
   });
 
 export const useGoals = () =>
@@ -628,5 +664,56 @@ export function useReverseContribution() {
       toast.success('Katkı geri alındı');
     },
     onError: () => toast.error('Geri alınamadı'),
+  });
+}
+
+function invalidateSubscriptionQueries(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['subscriptions'] });
+  void qc.invalidateQueries({ queryKey: ['subscriptionSummary'] });
+}
+
+export function useMarkSubscriptionStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; status: SubscriptionStatus }) =>
+      gqlFetcher<
+        { markSubscriptionStatus: { id: string; status: SubscriptionStatus } },
+        { id: string; status: SubscriptionStatus }
+      >(MARK_SUB_STATUS_M, vars),
+    onSuccess: (_data, vars) => {
+      invalidateSubscriptionQueries(qc);
+      toast.success(
+        vars.status === 'CANCELLABLE'
+          ? 'İptal edilebilir işaretlendi'
+          : 'Kullanılıyor olarak işaretlendi',
+      );
+    },
+    onError: (e: Error) => toast.error('İşaretlenemedi', { description: e.message }),
+  });
+}
+
+export function useCancelSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; contributionAmount?: number }) =>
+      gqlFetcher<
+        {
+          cancelSubscription: {
+            id: string;
+            name: string;
+            status: SubscriptionStatus;
+            yearlyAmount: number;
+          };
+        },
+        { id: string; contributionAmount?: number }
+      >(CANCEL_SUB_M, vars),
+    onSuccess: (data) => {
+      invalidateSubscriptionQueries(qc);
+      invalidateContributionQueries(qc);
+      toast.success(
+        `${data.cancelSubscription.name} iptal edildi · ${Math.round(data.cancelSubscription.yearlyAmount)} ₺ yıllık tasarruf`,
+      );
+    },
+    onError: (e: Error) => toast.error('İptal edilemedi', { description: e.message }),
   });
 }

@@ -89,6 +89,8 @@ enum ContributionSource {
   MANUAL
   /// Otomatik kural tetiklemesi
   RULE_TRIGGERED
+  /// İptal edilen aboneliğin yıllık tutarı katkıya dönüşür
+  CANCELED_SUBSCRIPTION
 }
 
 enum ContributionStatus {

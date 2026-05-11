@@ -17,7 +17,13 @@ import type { ReactNode } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
 import { ScoreCard } from '@/components/score-card';
-import { useDashboard, useFutureScore, useGoals, useMe } from '@/lib/graphql/queries';
+import {
+  useDashboard,
+  useFutureScore,
+  useGoals,
+  useMe,
+  useSubscriptionSummary,
+} from '@/lib/graphql/queries';
 import { useApp } from '@/lib/stores/use-app';
 import { formatTRY } from '@/lib/utils';
 
@@ -29,6 +35,7 @@ export default function DashboardPage() {
   const { data: dash, isLoading: dashLoading } = useDashboard();
   const { data: goalsData } = useGoals();
   const { data: scoreData } = useFutureScore();
+  const { data: subData } = useSubscriptionSummary();
 
   const userName = me?.me?.name?.split(' ')[0] ?? '';
   const goal = goalsData?.goals[0];
@@ -148,6 +155,33 @@ export default function DashboardPage() {
           <div className="text-2xl">📈</div>
         </div>
       </Link>
+
+      {(subData?.subscriptionSummary?.activeCount ?? 0) > 0 && (
+        <Link href="/subscriptions" className="ny-card mb-3 block w-full text-left">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="ny-eyebrow">Aboneliklerin</div>
+              <div className="mt-1 text-xl font-semibold">
+                {formatTRY(subData?.subscriptionSummary?.activeMonthlyTotal ?? 0)}
+                <span className="text-sm opacity-60"> /ay</span>
+              </div>
+              <div className="text-xs opacity-60">
+                {subData?.subscriptionSummary?.activeCount} aktif
+                {(subData?.subscriptionSummary?.cancellableCount ?? 0) > 0 && (
+                  <>
+                    {' · '}
+                    <span className="text-primary font-semibold">
+                      {subData?.subscriptionSummary?.cancellableCount} iptal adayı (yıllık +
+                      {formatTRY(subData?.subscriptionSummary?.potentialYearlySavings ?? 0)})
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="text-2xl">📺</div>
+          </div>
+        </Link>
+      )}
 
       {goal && (
         <Link href="/goals" className="ny-card mb-3 block w-full text-left">
