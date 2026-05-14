@@ -52,6 +52,11 @@ enum GoalStatus {
   ACHIEVED
 }
 
+enum PriceAlertDirection {
+  INCREASE
+  DECREASE
+}
+
 enum RuleFrequency {
   WEEKLY
   MONTHLY
@@ -283,6 +288,17 @@ model Goal {
   status              GoalStatus @default(ACTIVE)
   /// [{ date, price }] formatında price tracking
   priceHistory        Json?
+  /// Goal tracking ürün sorgusunun ham hali
+  rawQuery            String?
+  /// Goal tracking normalize edilmiş ürün sorgusu
+  normalizedQuery     String?
+  category            String?
+  selectedProductTitle String?
+  productUrl          String?
+  productImage        String?
+  productSource       String?
+  currency            String     @default("TRY")
+  lastCheckedAt       DateTime?
   /// Goal Forecasting Agent (Pattern C) için context
   coachContext        String?
   autoUpdate          Boolean    @default(true)
@@ -291,6 +307,8 @@ model Goal {
 
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   checkpoints        GoalCheckpoint[]
+  goalPriceHistory   GoalPriceHistory[]
+  goalPriceAlerts    GoalPriceAlert[]
   microContributions MicroContribution[]
 
   @@index([userId, status])
@@ -308,6 +326,36 @@ model GoalCheckpoint {
   goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
   @@unique([goalId, percent])
+}
+
+model GoalPriceHistory {
+  id        String   @id @default(cuid())
+  goalId    String
+  checkedAt DateTime @default(now())
+  price     Decimal  @db.Money
+  currency  String   @default("TRY")
+  source    String
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, checkedAt])
+}
+
+model GoalPriceAlert {
+  id                    String              @id @default(cuid())
+  goalId                String
+  oldPrice              Decimal             @db.Money
+  newPrice              Decimal             @db.Money
+  percentageChange      Decimal             @db.Decimal(8, 6)
+  direction             PriceAlertDirection
+  remainingAmountImpact Decimal             @db.Money
+  monthlySavingNeeded   Decimal             @db.Money
+  readAt                DateTime?
+  createdAt             DateTime            @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, readAt])
 }
 
 model Rule {

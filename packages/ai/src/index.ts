@@ -38,5 +38,10 @@ export {
   type CoachResult,
   type CoachToolCallTrace,
 } from './agents/saving-coach';
+export {
+  GeminiQueryRewriteAdapter,
+  type ProductQueryRewriteAdapter,
+  type QueryRewriteAdapterOptions,
+} from './query-normalizer';
 
 export const AI_PACKAGE_VERSION = '0.2.0';

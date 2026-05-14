@@ -10,6 +10,9 @@
  * açılır; DB'de matching User olmadığı için Ayşe persona'sı görünür.
  */
 import { prisma } from '@niyet/db';
+import { GeminiQueryRewriteAdapter, type ProductQueryRewriteAdapter } from '@niyet/ai';
+import { RapidApiProductSearchProvider } from './goal-tracking/rapidapi';
+import type { ProductSearchProvider } from './goal-tracking/product-search';
 
 export interface GraphQLContext {
   prisma: typeof prisma;
@@ -17,22 +20,31 @@ export interface GraphQLContext {
   userId: string | null;
   /** Supabase Auth subject (auth.uid). Anonymous session'larda da var. */
   authId: string | null;
+  productSearch: ProductSearchProvider;
+  queryNormalizer: ProductQueryRewriteAdapter;
+  now: () => Date;
 }
 
 export interface CreateContextOptions {
   /** Supabase JWT'den extract edilmiş user id */
   authUserId?: string | null;
+  productSearch?: ProductSearchProvider;
+  queryNormalizer?: ProductQueryRewriteAdapter;
+  now?: () => Date;
 }
 
 export async function createContext(opts: CreateContextOptions = {}): Promise<GraphQLContext> {
   const authId = opts.authUserId ?? null;
+  const productSearch = opts.productSearch ?? new RapidApiProductSearchProvider();
+  const queryNormalizer = opts.queryNormalizer ?? new GeminiQueryRewriteAdapter();
+  const now = opts.now ?? (() => new Date());
 
   if (authId) {
     const user = await prisma.user.findUnique({
       where: { authId },
       select: { id: true },
     });
-    if (user) return { prisma, userId: user.id, authId };
+    if (user) return { prisma, userId: user.id, authId, productSearch, queryNormalizer, now };
   }
 
   // Ayşe fallback — demo aşamasında shared persona
@@ -44,5 +56,8 @@ export async function createContext(opts: CreateContextOptions = {}): Promise<Gr
     prisma,
     userId: ayse?.id ?? null,
     authId,
+    productSearch,
+    queryNormalizer,
+    now,
   };
 }
