@@ -5,6 +5,7 @@ import { calculateProgress, calculateRemainingAmount } from '@niyet/core';
 
 import { builder } from '../builder';
 import type { GraphQLContext } from '../context';
+import { ProductSearchError } from '../goal-tracking/product-search';
 import { GoalTrackingService } from '../goal-tracking/service';
 import { moneyToNumber } from '../goal-tracking/types';
 import {
@@ -298,9 +299,16 @@ builder.mutationField('searchGoalProducts', (t) =>
     type: [ProductSearchResultObject],
     authScopes: { authenticated: true },
     args: { query: t.arg.string({ required: true }) },
-    resolve: (_root, args, ctx) => {
+    resolve: async (_root, args, ctx) => {
       const input = SearchGoalProductsInputSchema.parse({ query: args.query });
-      return serviceFromContext(ctx).searchProducts(input.query);
+      try {
+        return await serviceFromContext(ctx).searchProducts(input.query);
+      } catch (error) {
+        if (error instanceof ProductSearchError) {
+          return [];
+        }
+        throw error;
+      }
     },
   }),
 );

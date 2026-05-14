@@ -7,7 +7,7 @@ import type {
 } from './product-search';
 import { ProductSearchError } from './product-search';
 
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 30000;
 const RETRY_BACKOFF_MS = [500, 1500] as const;
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
 
@@ -81,7 +81,9 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
     );
   }
 
-  // Wraps fetch with an 8s timeout and bounded retries for transient errors
+  // search-v2 can take 20s+ for broad queries such as iPhone; keep timeout
+  // above observed upstream latency and retry only transient failures.
+  // Wraps fetch with a bounded timeout and retries for transient errors
   // (network failures, 502/503/504). Permanent failures (429, 4xx, 5xx other
   // than retryable) propagate immediately. NETWORK_ERROR is only thrown after
   // all retries are exhausted.

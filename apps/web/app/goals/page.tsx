@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Sparkles, TrendingUp } from 'lucide-react';
+import { Search, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -33,19 +33,25 @@ export default function GoalsPage() {
 
   const goals = data?.goals ?? [];
 
-  const handleNormalize = async () => {
-    if (!rawQuery.trim()) return;
-    const result = await normalizeQuery.mutateAsync(rawQuery.trim());
-    setNormalizedQuery(result.normalizeGoalProductQuery.normalizedQuery);
-    setNormalizedCategory(result.normalizeGoalProductQuery.category);
-  };
-
   const handleSearch = async () => {
-    const query = normalizedQuery || rawQuery.trim();
+    const query = rawQuery.trim();
     if (!query) return;
-    const result = await searchProducts.mutateAsync(query);
-    setProducts(result.searchGoalProducts);
-    setSelectedProduct(result.searchGoalProducts[0] ?? null);
+
+    try {
+      const normalized = await normalizeQuery.mutateAsync(query);
+      const normalizedProductQuery = normalized.normalizeGoalProductQuery.normalizedQuery;
+      const result = await searchProducts.mutateAsync(normalizedProductQuery);
+
+      setNormalizedQuery(normalizedProductQuery);
+      setNormalizedCategory(normalized.normalizeGoalProductQuery.category);
+      setProducts(result.searchGoalProducts);
+      setSelectedProduct(result.searchGoalProducts[0] ?? null);
+    } catch {
+      setNormalizedQuery(query);
+      setNormalizedCategory(null);
+      setProducts([]);
+      setSelectedProduct(null);
+    }
   };
 
   const handleCreate = async () => {
@@ -154,22 +160,12 @@ export default function GoalsPage() {
         />
 
         <label className="mb-1 block text-xs opacity-60">Takip edilecek ürün (opsiyonel)</label>
-        <div className="mb-2 flex gap-2">
-          <input
-            value={rawQuery}
-            onChange={(e) => setRawQuery(e.target.value)}
-            placeholder="örn. iphone 15 128 gb"
-            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
-          />
-          <button
-            onClick={handleNormalize}
-            disabled={!rawQuery || normalizeQuery.isPending}
-            className="ny-chip whitespace-nowrap"
-          >
-            <Sparkles size={14} className="mr-1 inline" />
-            Normalize
-          </button>
-        </div>
+        <input
+          value={rawQuery}
+          onChange={(e) => setRawQuery(e.target.value)}
+          placeholder="örn. iphone 15 128 gb"
+          className="mb-2 w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
+        />
         {normalizedQuery && (
           <div className="mb-2 rounded-xl border border-[hsl(var(--hairline))] p-2 text-xs">
             <div className="font-semibold">Sorgu: {normalizedQuery}</div>
@@ -178,11 +174,11 @@ export default function GoalsPage() {
         )}
         <button
           onClick={handleSearch}
-          disabled={(!rawQuery && !normalizedQuery) || searchProducts.isPending}
+          disabled={!rawQuery || normalizeQuery.isPending || searchProducts.isPending}
           className="ny-chip mb-3"
         >
           <Search size={14} className="mr-1 inline" />
-          Ürün ara
+          {normalizeQuery.isPending || searchProducts.isPending ? 'Aranıyor...' : 'Ürün ara'}
         </button>
         {products.length > 0 && (
           <div className="mb-3 max-h-48 space-y-2 overflow-auto">
