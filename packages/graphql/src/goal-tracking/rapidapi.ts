@@ -149,19 +149,54 @@ function extractResults(payload: unknown): UnknownRecord[] {
 }
 
 function normalizeProductResult(item: UnknownRecord): ProductSearchResult | null {
-  const title = stringFrom(item.title) ?? stringFrom(item.name) ?? stringFrom(item.product_title);
+  // /search-v2 response shape:
+  //   product: { product_title, product_page_url, product_photos[], typical_price_range[],
+  //              offer: { offer_title, offer_page_url, price, store_name, ... } | null }
+  // /search (legacy, removed upstream) used a flatter shape; we keep its keys here for
+  // forward-compat in case the provider partially restores them.
+  const offer = isRecord(item.offer) ? item.offer : null;
+  const photos = Array.isArray(item.product_photos) ? item.product_photos : [];
+  const priceRange = Array.isArray(item.typical_price_range) ? item.typical_price_range : [];
+
+  const title =
+    stringFrom(offer?.offer_title) ??
+    stringFrom(item.product_title) ??
+    stringFrom(item.title) ??
+    stringFrom(item.name);
+
   // url and image are rendered as href/src in the UI — must be http(s) only.
   // safeHttpUrl rejects javascript:, data:, vbscript:, file:, etc.
-  const url = safeHttpUrl(item.url) ?? safeHttpUrl(item.link) ?? safeHttpUrl(item.product_url);
+  // Prefer offer_page_url (direct merchant link) over product_page_url (Google Shopping).
+  const url =
+    safeHttpUrl(offer?.offer_page_url) ??
+    safeHttpUrl(item.product_page_url) ??
+    safeHttpUrl(item.url) ??
+    safeHttpUrl(item.link) ??
+    safeHttpUrl(item.product_url);
+
   const image =
-    safeHttpUrl(item.image) ?? safeHttpUrl(item.thumbnail) ?? safeHttpUrl(item.product_image);
+    safeHttpUrl(photos[0]) ??
+    safeHttpUrl(item.image) ??
+    safeHttpUrl(item.thumbnail) ??
+    safeHttpUrl(item.product_image);
+
   const source =
+    stringFrom(offer?.store_name) ??
     stringFrom(item.source) ??
     stringFrom(item.store) ??
     stringFrom(item.merchant) ??
     hostnameFromUrl(url);
+
+  // /search-v2 prices are localized strings ("₺46.999,00"); parsePrice handles them.
+  // typical_price_range gives a low-end fallback when no offer is attached.
   const rawPrice =
-    item.price ?? item.extracted_price ?? item.offer_price ?? item.product_price ?? item.price_text;
+    offer?.price ??
+    priceRange[0] ??
+    item.price ??
+    item.extracted_price ??
+    item.offer_price ??
+    item.product_price ??
+    item.price_text;
   const parsedPrice = parsePrice(
     typeof rawPrice === 'number' || typeof rawPrice === 'string' ? rawPrice : null,
   );
