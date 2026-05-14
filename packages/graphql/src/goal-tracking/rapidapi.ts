@@ -42,7 +42,7 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
       throw new ProductSearchError('MISSING_API_KEY', 'RapidAPI key is not configured.');
     }
 
-    const url = new URL(`https://${this.host}/search`);
+    const url = new URL(`https://${this.host}/search-v2`);
     url.searchParams.set('q', query);
     url.searchParams.set('country', this.country);
     url.searchParams.set('language', this.language);
