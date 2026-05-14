@@ -7,6 +7,10 @@ import type {
 } from './product-search';
 import { ProductSearchError } from './product-search';
 
+const REQUEST_TIMEOUT_MS = 8000;
+const RETRY_BACKOFF_MS = [500, 1500] as const;
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
 interface RapidApiProductSearchProviderOptions {
   apiKey?: string;
   host?: string;
@@ -43,17 +47,7 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
     url.searchParams.set('country', this.country);
     url.searchParams.set('language', this.language);
 
-    let response: Response;
-    try {
-      response = await this.fetchImpl(url, {
-        headers: {
-          'x-rapidapi-host': this.host,
-          'x-rapidapi-key': this.apiKey,
-        },
-      });
-    } catch (error) {
-      throw new ProductSearchError('NETWORK_ERROR', 'RapidAPI product search failed.', error);
-    }
+    const response = await this.fetchWithRetry(url);
 
     if (response.status === 429) {
       throw new ProductSearchError('RATE_LIMITED', 'RapidAPI rate limit exceeded.');
@@ -84,6 +78,49 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
       matchByTitle(products, goal.selectedProductTitle) ??
       matchBySource(products, goal.productSource) ??
       null
+    );
+  }
+
+  // Wraps fetch with an 8s timeout and bounded retries for transient errors
+  // (network failures, 502/503/504). Permanent failures (429, 4xx, 5xx other
+  // than retryable) propagate immediately. NETWORK_ERROR is only thrown after
+  // all retries are exhausted.
+  private async fetchWithRetry(url: URL): Promise<Response> {
+    const maxAttempts = 1 + RETRY_BACKOFF_MS.length;
+    let lastNetworkError: unknown;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await sleep(RETRY_BACKOFF_MS[attempt - 1] ?? 0);
+      }
+
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          headers: {
+            'x-rapidapi-host': this.host,
+            'x-rapidapi-key': this.apiKey ?? '',
+          },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+      } catch (error) {
+        lastNetworkError = error;
+        continue;
+      }
+
+      // Retry on transient upstream errors; otherwise hand the response back
+      // and let the caller classify it (429, 4xx, success, etc.).
+      if (RETRYABLE_STATUS.has(response.status) && attempt < maxAttempts - 1) {
+        continue;
+      }
+
+      return response;
+    }
+
+    throw new ProductSearchError(
+      'NETWORK_ERROR',
+      `RapidAPI product search failed after ${maxAttempts} attempts.`,
+      lastNetworkError,
     );
   }
 }
@@ -259,4 +296,8 @@ function safeHttpUrl(value: unknown): string | null {
 
 function isRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
