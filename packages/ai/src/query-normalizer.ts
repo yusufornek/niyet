@@ -45,6 +45,8 @@ export class GeminiQueryRewriteAdapter implements ProductQueryRewriteAdapter {
   }
 
   async normalizeProductQuery(rawQuery: string): Promise<ProductQueryNormalization | null> {
+    // No API key → caller must fall back to regex normalizer (packages/core).
+    // Intentionally silent: this is a configuration state, not an error.
     if (!this.apiKey) {
       return null;
     }
@@ -70,6 +72,11 @@ export class GeminiQueryRewriteAdapter implements ProductQueryRewriteAdapter {
       });
 
       if (!response.ok) {
+        console.warn('[ai.query-normalizer] gemini_http_error', {
+          status: response.status,
+          statusText: response.statusText,
+          rawQueryLength: rawQuery.length,
+        });
         return null;
       }
 
@@ -80,13 +87,32 @@ export class GeminiQueryRewriteAdapter implements ProductQueryRewriteAdapter {
         .trim();
 
       if (!text) {
+        console.warn('[ai.query-normalizer] gemini_empty_response', {
+          candidateCount: payload.candidates?.length ?? 0,
+          rawQueryLength: rawQuery.length,
+        });
         return null;
       }
 
       const parsedJson = safeJsonParse(text);
+      if (parsedJson === null) {
+        console.warn('[ai.query-normalizer] gemini_invalid_json', {
+          textLength: text.length,
+          textPreview: text.slice(0, 80),
+        });
+        return null;
+      }
+
       const parsed = LlmNormalizationSchema.safeParse(parsedJson);
 
       if (!parsed.success) {
+        console.warn('[ai.query-normalizer] gemini_schema_mismatch', {
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join('.'),
+            code: issue.code,
+            message: issue.message,
+          })),
+        });
         return null;
       }
 
@@ -97,7 +123,12 @@ export class GeminiQueryRewriteAdapter implements ProductQueryRewriteAdapter {
         confidence: parsed.data.confidence,
         source: 'llm',
       };
-    } catch {
+    } catch (error) {
+      console.warn('[ai.query-normalizer] gemini_call_failed', {
+        error:
+          error instanceof Error ? { name: error.name, message: error.message } : String(error),
+        rawQueryLength: rawQuery.length,
+      });
       return null;
     }
   }
@@ -125,6 +156,8 @@ export class GeminiQueryRewriteAdapter implements ProductQueryRewriteAdapter {
   }
 }
 
+// Returns null on invalid JSON. Caller is expected to log the failure with
+// surrounding context (text preview, length, etc.) — see gemini_invalid_json.
 function safeJsonParse(value: string): unknown {
   try {
     return JSON.parse(stripJsonFence(value));
@@ -134,5 +167,8 @@ function safeJsonParse(value: string): unknown {
 }
 
 function stripJsonFence(value: string): string {
-  return value.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  return value
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
 }
