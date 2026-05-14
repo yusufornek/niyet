@@ -199,6 +199,53 @@ export interface Goal {
   autoUpdate: boolean;
   checkpoints?: GoalCheckpoint[];
   priceHistory?: Array<{ date: string; price: number }>;
+  rawQuery?: string | null;
+  normalizedQuery?: string | null;
+  category?: string | null;
+  selectedProductTitle?: string | null;
+  productUrl?: string | null;
+  productImage?: string | null;
+  productSource?: string | null;
+  currency?: string;
+  lastCheckedAt?: string | null;
+  trackedProgress?: number;
+  trackedRemainingAmount?: number;
+}
+
+export interface ProductQueryNormalization {
+  rawQuery: string;
+  normalizedQuery: string;
+  category: string | null;
+  confidence: number;
+  source: string;
+}
+
+export interface ProductSearchResult {
+  title: string;
+  url: string;
+  image: string | null;
+  source: string;
+  price: number;
+  currency: string;
+}
+
+export interface GoalPriceAlert {
+  id: string;
+  goalId: string;
+  oldPrice: number;
+  newPrice: number;
+  percentageChange: number;
+  direction: 'INCREASE' | 'DECREASE';
+  remainingAmountImpact: number;
+  monthlySavingNeeded: number;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface GoalPriceRefreshResult {
+  goal: Goal;
+  message: string | null;
+  alert: GoalPriceAlert | null;
 }
 
 export interface FutureScore {
@@ -362,7 +409,16 @@ const GOAL_Q = `query Goal($id: ID!) {
   goal(id: $id) {
     id name basePrice currentPrice inflationPct targetDate current
     monthlyContribution status autoUpdate priceHistory
+    rawQuery normalizedQuery category selectedProductTitle productUrl
+    productImage productSource currency lastCheckedAt
+    trackedProgress trackedRemainingAmount
     checkpoints { id percent label reached reachedAt }
+  }
+}`;
+const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {
+  goalPriceAlerts(unreadOnly: $unreadOnly) {
+    id goalId oldPrice newPrice percentageChange direction
+    remainingAmountImpact monthlySavingNeeded readAt createdAt
   }
 }`;
 const FUTURE_SCORE_Q = `query FutureScore {
@@ -466,6 +522,16 @@ export const useGoal = (id: string) =>
     enabled: !!id,
   });
 
+export const useGoalPriceAlerts = (unreadOnly = false) =>
+  useQuery({
+    queryKey: ['goalPriceAlerts', unreadOnly],
+    queryFn: () =>
+      gqlFetcher<{ goalPriceAlerts: GoalPriceAlert[] }, { unreadOnly: boolean }>(GOAL_PRICE_ALERTS_Q, {
+        unreadOnly,
+      }),
+    staleTime: 30_000,
+  });
+
 export const useFutureScore = () =>
   useQuery({
     queryKey: ['futureScore'],
@@ -561,6 +627,32 @@ const UPDATE_GOAL_M = `mutation UpdateGoal($id: ID!, $input: GoalUpdateInput!) {
     id name monthlyContribution inflationPct autoUpdate coachContext
   }
 }`;
+const NORMALIZE_GOAL_QUERY_M = `mutation NormalizeGoalProductQuery($rawQuery: String!) {
+  normalizeGoalProductQuery(rawQuery: $rawQuery) {
+    rawQuery normalizedQuery category confidence source
+  }
+}`;
+const SEARCH_GOAL_PRODUCTS_M = `mutation SearchGoalProducts($query: String!) {
+  searchGoalProducts(query: $query) {
+    title url image source price currency
+  }
+}`;
+const REFRESH_GOAL_TRACKED_PRICE_M = `mutation RefreshGoalTrackedPrice($goalId: ID!) {
+  refreshGoalTrackedPrice(goalId: $goalId) {
+    message
+    goal {
+      id currentPrice currency lastCheckedAt productSource productImage
+      trackedProgress trackedRemainingAmount
+    }
+    alert {
+      id goalId oldPrice newPrice percentageChange direction
+      remainingAmountImpact monthlySavingNeeded readAt createdAt
+    }
+  }
+}`;
+const MARK_GOAL_ALERT_READ_M = `mutation MarkGoalPriceAlertRead($alertId: ID!) {
+  markGoalPriceAlertRead(alertId: $alertId) { id readAt }
+}`;
 
 const RUN_ANALYSIS_M = `mutation RunAnalysis($forceRefresh: Boolean) {
   runAnalysis(forceRefresh: $forceRefresh) {
@@ -596,6 +688,17 @@ export interface GoalInput {
   targetDate: string;
   inflationPct?: number;
   monthlyContribution?: number;
+  tracking?: {
+    rawQuery: string;
+    normalizedQuery: string;
+    category?: string | null;
+    selectedProductTitle: string;
+    productUrl: string;
+    productImage?: string | null;
+    productSource: string;
+    price: number;
+    currency?: string;
+  };
 }
 
 export function useCreateGoal() {
@@ -630,6 +733,62 @@ export function useUpdateGoal() {
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['goals'] });
       void qc.invalidateQueries({ queryKey: ['goal', vars.id] });
+    },
+  });
+}
+
+export function useNormalizeGoalProductQuery() {
+  return useMutation({
+    mutationFn: (rawQuery: string) =>
+      gqlFetcher<{ normalizeGoalProductQuery: ProductQueryNormalization }, { rawQuery: string }>(
+        NORMALIZE_GOAL_QUERY_M,
+        { rawQuery },
+      ),
+  });
+}
+
+export function useSearchGoalProducts() {
+  return useMutation({
+    mutationFn: (query: string) =>
+      gqlFetcher<{ searchGoalProducts: ProductSearchResult[] }, { query: string }>(SEARCH_GOAL_PRODUCTS_M, {
+        query,
+      }),
+  });
+}
+
+export function useRefreshGoalTrackedPrice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (goalId: string) =>
+      gqlFetcher<{ refreshGoalTrackedPrice: GoalPriceRefreshResult }, { goalId: string }>(
+        REFRESH_GOAL_TRACKED_PRICE_M,
+        { goalId },
+      ),
+    onSuccess: (data) => {
+      const goalId = data.refreshGoalTrackedPrice.goal.id;
+      void qc.invalidateQueries({ queryKey: ['goal', goalId] });
+      void qc.invalidateQueries({ queryKey: ['goals'] });
+      void qc.invalidateQueries({ queryKey: ['goalPriceAlerts'] });
+      if (data.refreshGoalTrackedPrice.message) {
+        toast.message(data.refreshGoalTrackedPrice.message);
+      } else {
+        toast.success('Ürün fiyatı güncellendi');
+      }
+    },
+    onError: (e: Error) => toast.error('Fiyat yenilenemedi', { description: e.message }),
+  });
+}
+
+export function useMarkGoalPriceAlertRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (alertId: string) =>
+      gqlFetcher<{ markGoalPriceAlertRead: { id: string; readAt: string | null } }, { alertId: string }>(
+        MARK_GOAL_ALERT_READ_M,
+        { alertId },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['goalPriceAlerts'] });
     },
   });
 }

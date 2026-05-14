@@ -1,10 +1,22 @@
 /**
- * Goal + GoalCheckpoint + mutations.
+ * Goal + GoalCheckpoint + goal-tracking operations.
  */
-import { builder } from '../builder';
-import { GoalStatusRef } from './enums';
+import { calculateProgress, calculateRemainingAmount } from '@niyet/core';
 
-builder.prismaObject('Goal', {
+import { builder } from '../builder';
+import type { GraphQLContext } from '../context';
+import { GoalTrackingService } from '../goal-tracking/service';
+import { moneyToNumber } from '../goal-tracking/types';
+import {
+  AlertIdInputSchema,
+  CreateGoalTrackingInputSchema,
+  GoalIdInputSchema,
+  NormalizeGoalProductQueryInputSchema,
+  SearchGoalProductsInputSchema,
+} from '../goal-tracking/validation';
+import { GoalStatusRef, PriceAlertDirectionRef } from './enums';
+
+const GoalRef = builder.prismaObject('Goal', {
   fields: (t) => ({
     id: t.exposeID('id'),
     name: t.exposeString('name'),
@@ -21,6 +33,23 @@ builder.prismaObject('Goal', {
     priceHistory: t.expose('priceHistory', { type: 'JSON', nullable: true }),
     coachContext: t.exposeString('coachContext', { nullable: true }),
     autoUpdate: t.exposeBoolean('autoUpdate'),
+
+    rawQuery: t.exposeString('rawQuery', { nullable: true }),
+    normalizedQuery: t.exposeString('normalizedQuery', { nullable: true }),
+    category: t.exposeString('category', { nullable: true }),
+    selectedProductTitle: t.exposeString('selectedProductTitle', { nullable: true }),
+    productUrl: t.exposeString('productUrl', { nullable: true }),
+    productImage: t.exposeString('productImage', { nullable: true }),
+    productSource: t.exposeString('productSource', { nullable: true }),
+    currency: t.exposeString('currency'),
+    lastCheckedAt: t.expose('lastCheckedAt', { type: 'DateTime', nullable: true }),
+    trackedProgress: t.float({
+      resolve: (goal) => calculateProgress(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
+    }),
+    trackedRemainingAmount: t.float({
+      resolve: (goal) => calculateRemainingAmount(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
+    }),
+
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     checkpoints: t.relation('checkpoints'),
@@ -37,10 +66,52 @@ builder.prismaObject('GoalCheckpoint', {
   }),
 });
 
-// ─────────────────────────────────────────────────────────────
-// Queries
-// ─────────────────────────────────────────────────────────────
+const GoalPriceAlertRef = builder.prismaObject('GoalPriceAlert', {
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    goalId: t.exposeString('goalId'),
+    oldPrice: t.float({ resolve: (row) => moneyToNumber(row.oldPrice) }),
+    newPrice: t.float({ resolve: (row) => moneyToNumber(row.newPrice) }),
+    percentageChange: t.float({ resolve: (row) => Number(row.percentageChange) }),
+    direction: t.expose('direction', { type: PriceAlertDirectionRef }),
+    remainingAmountImpact: t.float({ resolve: (row) => moneyToNumber(row.remainingAmountImpact) }),
+    monthlySavingNeeded: t.float({ resolve: (row) => moneyToNumber(row.monthlySavingNeeded) }),
+    readAt: t.expose('readAt', { type: 'DateTime', nullable: true }),
+    createdAt: t.expose('createdAt', { type: 'DateTime' }),
+    goal: t.relation('goal'),
+  }),
+});
 
+const ProductQueryNormalizationObject = builder.simpleObject('ProductQueryNormalization', {
+  fields: (t) => ({
+    rawQuery: t.string(),
+    normalizedQuery: t.string(),
+    category: t.string({ nullable: true }),
+    confidence: t.float(),
+    source: t.string(),
+  }),
+});
+
+const ProductSearchResultObject = builder.simpleObject('ProductSearchResult', {
+  fields: (t) => ({
+    title: t.string(),
+    url: t.string(),
+    image: t.string({ nullable: true }),
+    source: t.string(),
+    price: t.float(),
+    currency: t.string(),
+  }),
+});
+
+const PriceRefreshResultObject = builder.simpleObject('GoalPriceRefreshResult', {
+  fields: (t) => ({
+    goal: t.field({ type: GoalRef }),
+    message: t.string({ nullable: true }),
+    alert: t.field({ type: GoalPriceAlertRef, nullable: true }),
+  }),
+});
+
+// Queries
 builder.queryField('goals', (t) =>
   t.prismaField({
     type: ['Goal'],
@@ -70,9 +141,31 @@ builder.queryField('goal', (t) =>
   }),
 );
 
-// ─────────────────────────────────────────────────────────────
+builder.queryField('goalPriceAlerts', (t) =>
+  t.field({
+    type: [GoalPriceAlertRef],
+    authScopes: { authenticated: true },
+    args: { unreadOnly: t.arg.boolean({ defaultValue: false }) },
+    resolve: async (_root, args, ctx) => {
+      return serviceFromContext(ctx).listAlerts(ctx.userId!, args.unreadOnly ?? false);
+    },
+  }),
+);
+
 // Mutations
-// ─────────────────────────────────────────────────────────────
+const GoalTrackingInputType = builder.inputType('GoalTrackingInput', {
+  fields: (t) => ({
+    rawQuery: t.string({ required: true }),
+    normalizedQuery: t.string({ required: true }),
+    category: t.string(),
+    selectedProductTitle: t.string({ required: true }),
+    productUrl: t.string({ required: true }),
+    productImage: t.string(),
+    productSource: t.string({ required: true }),
+    price: t.float({ required: true }),
+    currency: t.string(),
+  }),
+});
 
 const GoalInputType = builder.inputType('GoalInput', {
   fields: (t) => ({
@@ -81,6 +174,7 @@ const GoalInputType = builder.inputType('GoalInput', {
     targetDate: t.field({ type: 'DateTime', required: true }),
     inflationPct: t.float({ defaultValue: 32 }),
     monthlyContribution: t.float({ defaultValue: 0 }),
+    tracking: t.field({ type: GoalTrackingInputType }),
   }),
 });
 
@@ -91,36 +185,53 @@ builder.mutationField('createGoal', (t) =>
     args: { input: t.arg({ type: GoalInputType, required: true }) },
     resolve: async (query, _root, args, ctx) => {
       const input = args.input;
+      const tracking = input.tracking ? CreateGoalTrackingInputSchema.parse(input.tracking) : null;
+
       const goal = await ctx.prisma.goal.create({
         ...query,
         data: {
           userId: ctx.userId!,
           name: input.name,
           basePrice: input.basePrice,
-          currentPrice: input.basePrice,
+          currentPrice: tracking?.price ?? input.basePrice,
           inflationPct: input.inflationPct ?? 32,
           targetDate: input.targetDate,
           current: 0,
           monthlyContribution: input.monthlyContribution ?? 0,
           status: 'ACTIVE',
           autoUpdate: true,
+          rawQuery: tracking?.rawQuery ?? null,
+          normalizedQuery: tracking?.normalizedQuery ?? null,
+          category: tracking?.category ?? null,
+          selectedProductTitle: tracking?.selectedProductTitle ?? null,
+          productUrl: tracking?.productUrl ?? null,
+          productImage: tracking?.productImage ?? null,
+          productSource: tracking?.productSource ?? null,
+          currency: tracking?.currency ?? 'TRY',
+          lastCheckedAt: tracking ? new Date() : null,
         },
       });
-      // Default 4 checkpoint
+
       await ctx.prisma.goalCheckpoint.createMany({
         data: [10, 25, 50, 75].map((pct) => ({
           goalId: goal.id,
           percent: pct,
-          label:
-            pct === 10
-              ? 'İlk %10'
-              : pct === 25
-                ? 'Çeyrek yol'
-                : pct === 50
-                  ? 'Yarı yol'
-                  : 'Son düzlük',
+          label: pct === 10 ? 'İlk %10' : pct === 25 ? 'Çeyrek yol' : pct === 50 ? 'Yarı yol' : 'Son düzlük',
         })),
       });
+
+      if (tracking) {
+        await ctx.prisma.goalPriceHistory.create({
+          data: {
+            goalId: goal.id,
+            checkedAt: new Date(),
+            price: tracking.price,
+            currency: tracking.currency,
+            source: tracking.productSource,
+          },
+        });
+      }
+
       return goal;
     },
   }),
@@ -150,17 +261,17 @@ builder.mutationField('updateGoal', (t) =>
         select: { id: true },
       });
       if (!goal) throw new Error('Hedef bulunamadı veya erişim reddedildi.');
+
       const data: Record<string, unknown> = {};
       const input = args.input;
       if (input.name !== undefined && input.name !== null) data.name = input.name;
-      if (input.monthlyContribution !== undefined && input.monthlyContribution !== null)
+      if (input.monthlyContribution !== undefined && input.monthlyContribution !== null) {
         data.monthlyContribution = input.monthlyContribution;
-      if (input.inflationPct !== undefined && input.inflationPct !== null)
-        data.inflationPct = input.inflationPct;
-      if (input.autoUpdate !== undefined && input.autoUpdate !== null)
-        data.autoUpdate = input.autoUpdate;
-      if (input.coachContext !== undefined && input.coachContext !== null)
-        data.coachContext = input.coachContext;
+      }
+      if (input.inflationPct !== undefined && input.inflationPct !== null) data.inflationPct = input.inflationPct;
+      if (input.autoUpdate !== undefined && input.autoUpdate !== null) data.autoUpdate = input.autoUpdate;
+      if (input.coachContext !== undefined && input.coachContext !== null) data.coachContext = input.coachContext;
+
       return ctx.prisma.goal.update({
         ...query,
         where: { id: String(args.id) },
@@ -169,3 +280,64 @@ builder.mutationField('updateGoal', (t) =>
     },
   }),
 );
+
+builder.mutationField('normalizeGoalProductQuery', (t) =>
+  t.field({
+    type: ProductQueryNormalizationObject,
+    authScopes: { authenticated: true },
+    args: { rawQuery: t.arg.string({ required: true }) },
+    resolve: (_root, args, ctx) => {
+      const input = NormalizeGoalProductQueryInputSchema.parse({ rawQuery: args.rawQuery });
+      return serviceFromContext(ctx).normalizeQuery(input.rawQuery);
+    },
+  }),
+);
+
+builder.mutationField('searchGoalProducts', (t) =>
+  t.field({
+    type: [ProductSearchResultObject],
+    authScopes: { authenticated: true },
+    args: { query: t.arg.string({ required: true }) },
+    resolve: (_root, args, ctx) => {
+      const input = SearchGoalProductsInputSchema.parse({ query: args.query });
+      return serviceFromContext(ctx).searchProducts(input.query);
+    },
+  }),
+);
+
+builder.mutationField('refreshGoalTrackedPrice', (t) =>
+  t.field({
+    type: PriceRefreshResultObject,
+    authScopes: { authenticated: true },
+    args: { goalId: t.arg.id({ required: true }) },
+    resolve: (_root, args, ctx) => {
+      const input = GoalIdInputSchema.parse({ goalId: String(args.goalId) });
+      return serviceFromContext(ctx).refreshPrice(ctx.userId!, input.goalId);
+    },
+  }),
+);
+
+builder.mutationField('markGoalPriceAlertRead', (t) =>
+  t.prismaField({
+    type: GoalPriceAlertRef,
+    authScopes: { authenticated: true },
+    args: { alertId: t.arg.id({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      const input = AlertIdInputSchema.parse({ alertId: String(args.alertId) });
+      const alert = await serviceFromContext(ctx).markAlertRead(ctx.userId!, input.alertId);
+      return ctx.prisma.goalPriceAlert.findUniqueOrThrow({
+        ...query,
+        where: { id: alert.id },
+      });
+    },
+  }),
+);
+
+function serviceFromContext(ctx: GraphQLContext) {
+  return new GoalTrackingService({
+    prisma: ctx.prisma,
+    productSearch: ctx.productSearch,
+    queryNormalizer: ctx.queryNormalizer,
+    now: ctx.now,
+  });
+}

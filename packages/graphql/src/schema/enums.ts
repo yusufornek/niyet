@@ -9,6 +9,7 @@ import {
   ContributionStatus,
   GoalStatus,
   NotificationType,
+  PriceAlertDirection,
   RuleFrequency,
   SpendingCategory,
   SubscriptionStatus,
@@ -25,6 +26,9 @@ export const SubscriptionStatusRef = builder.enumType(SubscriptionStatus, {
   name: 'SubscriptionStatus',
 });
 export const GoalStatusRef = builder.enumType(GoalStatus, { name: 'GoalStatus' });
+export const PriceAlertDirectionRef = builder.enumType(PriceAlertDirection, {
+  name: 'PriceAlertDirection',
+});
 export const RuleFrequencyRef = builder.enumType(RuleFrequency, { name: 'RuleFrequency' });
 export const AccountTypeRef = builder.enumType(AccountType, { name: 'AccountType' });
 export const CircleTypeRef = builder.enumType(CircleType, { name: 'CircleType' });

@@ -13,3 +13,4 @@ export * from './types';
 export * from './formatters';
 export * from './future-score';
 export * from './savings-engine';
+export * from './goal-tracking';
