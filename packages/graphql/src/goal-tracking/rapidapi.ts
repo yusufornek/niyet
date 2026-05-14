@@ -1,6 +1,10 @@
 import { parsePrice } from '@niyet/core';
 
-import type { GoalPriceRefreshCandidate, ProductSearchProvider, ProductSearchResult } from './product-search';
+import type {
+  GoalPriceRefreshCandidate,
+  ProductSearchProvider,
+  ProductSearchResult,
+} from './product-search';
 import { ProductSearchError } from './product-search';
 
 interface RapidApiProductSearchProviderOptions {
@@ -22,7 +26,8 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
 
   constructor(options: RapidApiProductSearchProviderOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.RAPIDAPI_KEY;
-    this.host = options.host ?? process.env.RAPIDAPI_HOST ?? 'real-time-product-search.p.rapidapi.com';
+    this.host =
+      options.host ?? process.env.RAPIDAPI_HOST ?? 'real-time-product-search.p.rapidapi.com';
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.country = options.country ?? 'tr';
     this.language = options.language ?? 'tr';
@@ -70,7 +75,9 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
     return results;
   }
 
-  async refreshTrackedProductPrice(goal: GoalPriceRefreshCandidate): Promise<ProductSearchResult | null> {
+  async refreshTrackedProductPrice(
+    goal: GoalPriceRefreshCandidate,
+  ): Promise<ProductSearchResult | null> {
     const products = await this.searchProducts(goal.normalizedQuery);
     return (
       matchByUrl(products, goal.productUrl) ??
@@ -106,10 +113,16 @@ function extractResults(payload: unknown): UnknownRecord[] {
 
 function normalizeProductResult(item: UnknownRecord): ProductSearchResult | null {
   const title = stringFrom(item.title) ?? stringFrom(item.name) ?? stringFrom(item.product_title);
-  const url = stringFrom(item.url) ?? stringFrom(item.link) ?? stringFrom(item.product_url);
-  const image = stringFrom(item.image) ?? stringFrom(item.thumbnail) ?? stringFrom(item.product_image) ?? null;
+  // url and image are rendered as href/src in the UI — must be http(s) only.
+  // safeHttpUrl rejects javascript:, data:, vbscript:, file:, etc.
+  const url = safeHttpUrl(item.url) ?? safeHttpUrl(item.link) ?? safeHttpUrl(item.product_url);
+  const image =
+    safeHttpUrl(item.image) ?? safeHttpUrl(item.thumbnail) ?? safeHttpUrl(item.product_image);
   const source =
-    stringFrom(item.source) ?? stringFrom(item.store) ?? stringFrom(item.merchant) ?? hostnameFromUrl(url);
+    stringFrom(item.source) ??
+    stringFrom(item.store) ??
+    stringFrom(item.merchant) ??
+    hostnameFromUrl(url);
   const rawPrice =
     item.price ?? item.extracted_price ?? item.offer_price ?? item.product_price ?? item.price_text;
   const parsedPrice = parsePrice(
@@ -130,7 +143,10 @@ function normalizeProductResult(item: UnknownRecord): ProductSearchResult | null
   };
 }
 
-function matchByUrl(products: ProductSearchResult[], productUrl: string | null): ProductSearchResult | null {
+function matchByUrl(
+  products: ProductSearchResult[],
+  productUrl: string | null,
+): ProductSearchResult | null {
   if (!productUrl) {
     return null;
   }
@@ -168,8 +184,10 @@ function matchBySource(
 
   const normalizedSource = normalizeComparableText(productSource);
   return (
-    products.find((product) => normalizeComparableText(product.source) === normalizedSource && product.price > 0) ??
-    null
+    products.find(
+      (product) =>
+        normalizeComparableText(product.source) === normalizedSource && product.price > 0,
+    ) ?? null
   );
 }
 
@@ -219,6 +237,24 @@ function hostnameFromUrl(value: string | null | undefined): string | null {
 
 function stringFrom(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+// Accepts only http(s) URLs. Rejects javascript:, data:, vbscript:, file:, etc.
+// Returned URLs are safe to render as href/src in the UI.
+function safeHttpUrl(value: unknown): string | null {
+  const raw = stringFrom(value);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
