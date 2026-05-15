@@ -140,6 +140,7 @@ model User {
   learnState         UserLearnState?
   learnProgress      UserLearnProgress[]
   futureScores       FutureScoreSnapshot[]
+  badges             UserBadge[]
   analysisRuns       AnalysisRun[]
   microContributions MicroContribution[]
   chatSessions       ChatSession[]
@@ -665,6 +666,18 @@ model FutureScoreSnapshot {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, computedAt])
+}
+
+model UserBadge {
+  id         String   @id @default(cuid())
+  userId     String
+  badgeKey   String
+  unlockedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeKey])
+  @@index([userId, unlockedAt])
 }
 
 model Notification {

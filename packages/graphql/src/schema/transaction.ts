@@ -4,6 +4,7 @@
 import type { SpendingCategory } from '@prisma/client';
 
 import { builder } from '../builder';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { PeriodEnum, SpendingCategoryRef } from './enums';
 
 builder.prismaObject('Transaction', {
@@ -222,11 +223,13 @@ builder.mutationField('editTransactionCategory', (t) =>
       if (!tx || tx.userId !== ctx.userId) {
         throw new Error('Transaction bulunamadı veya erişim reddedildi.');
       }
-      return ctx.prisma.transaction.update({
+      const updated = await ctx.prisma.transaction.update({
         ...query,
         where: { id: String(args.id) },
         data: { category: args.category, categoryEdited: true },
       });
+      await recomputeAndPersistFutureScore(ctx, ctx.userId!, 'TRANSACTION_CHANGED');
+      return updated;
     },
   }),
 );

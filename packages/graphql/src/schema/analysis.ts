@@ -7,6 +7,7 @@
 import { persistAnalysisResult, runSpendingAnalysis } from '@niyet/ai';
 
 import { builder } from '../builder';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { SpendingCategoryRef } from './enums';
 
 builder.prismaObject('AnalysisRun', {
@@ -139,6 +140,7 @@ builder.mutationField('runAnalysis', (t) =>
           payload: { runId: run.id, stubMode: result.stubMode ?? false },
         },
       });
+      await recomputeAndPersistFutureScore(ctx, userId, 'ANALYSIS_CHANGED');
 
       // 6. Pothos query include'ları ile yeniden çek
       return ctx.prisma.analysisRun.findUniqueOrThrow({

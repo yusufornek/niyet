@@ -3,11 +3,12 @@
 import { TrendingUp } from 'lucide-react';
 
 import { PhoneShell } from '@/components/phone-shell';
-import { useFutureScore } from '@/lib/graphql/queries';
+import { useFutureScoreInsights } from '@/lib/graphql/queries';
 
 export default function ScorePage() {
-  const { data, isLoading } = useFutureScore();
-  const score = data?.futureScore;
+  const { data, isLoading } = useFutureScoreInsights();
+  const score = data?.futureScoreInsights.current;
+  const insight = data?.futureScoreInsights;
 
   const factors = score
     ? [
@@ -27,9 +28,18 @@ export default function ScorePage() {
         </div>
         <div className="mt-2 text-white/60">üzerinden 100</div>
         <div className="mt-3 inline-flex items-center gap-1 text-sm text-[hsl(var(--primary-on-dark))]">
-          <TrendingUp size={14} /> Aktif takip
+          <TrendingUp size={14} /> {insight?.delta ?? 0} puan bu hafta
         </div>
       </div>
+      {!isLoading && insight && (
+        <div className="ny-card mb-4">
+          <div className="text-sm font-semibold">{insight.label}</div>
+          <div className="mt-1 text-xs opacity-70">
+            En yüksek etki: {insight.topDriver.metric} ({insight.topDriver.delta > 0 ? '+' : ''}
+            {insight.topDriver.delta})
+          </div>
+        </div>
+      )}
       <p className="ny-tagline mb-4">
         Skorun seni cezalandırmak için değil, motive etmek için var.
       </p>
@@ -52,6 +62,25 @@ export default function ScorePage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {!isLoading && insight && (
+        <div className="mt-5">
+          <h2 className="mb-2 text-sm font-semibold">Rozetler</h2>
+          {insight.badges.length === 0 ? (
+            <div className="ny-card text-sm opacity-70">Henüz rozet açılmadı.</div>
+          ) : (
+            <div className="space-y-2">
+              {insight.badges.map((badge) => (
+                <div key={badge.key} className="ny-card flex items-center justify-between text-sm">
+                  <span>{badge.title}</span>
+                  <span className="opacity-60">
+                    {new Date(badge.unlockedAt).toLocaleDateString('tr-TR')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </PhoneShell>
