@@ -20,6 +20,7 @@ import {
   NormalizeGoalProductQueryInputSchema,
   SearchGoalProductsInputSchema,
 } from '../goal-tracking/validation';
+import { fetchLatestTuikInflationRate } from '../inflation/tuik';
 import { GoalStatusRef, PriceAlertDirectionRef } from './enums';
 
 const GoalRef = builder.prismaObject('Goal', {
@@ -139,6 +140,17 @@ const PriceRefreshResultObject = builder.simpleObject('GoalPriceRefreshResult', 
   }),
 });
 
+const InflationRateObject = builder.simpleObject('InflationRate', {
+  fields: (t) => ({
+    annualRate: t.float(),
+    monthlyRate: t.float({ nullable: true }),
+    period: t.string(),
+    publishedAt: t.field({ type: 'DateTime' }),
+    source: t.string(),
+    sourceUrl: t.string(),
+  }),
+});
+
 // Queries
 builder.queryField('goals', (t) =>
   t.prismaField({
@@ -180,6 +192,21 @@ builder.queryField('goalPriceAlerts', (t) =>
   }),
 );
 
+builder.queryField('latestInflationRate', (t) =>
+  t.field({
+    type: InflationRateObject,
+    nullable: true,
+    authScopes: { authenticated: true },
+    resolve: async () => {
+      try {
+        return await fetchLatestTuikInflationRate();
+      } catch {
+        return null;
+      }
+    },
+  }),
+);
+
 // Mutations
 const GoalTrackingInputType = builder.inputType('GoalTrackingInput', {
   fields: (t) => ({
@@ -200,7 +227,7 @@ const GoalInputType = builder.inputType('GoalInput', {
     name: t.string({ required: true }),
     basePrice: t.float({ required: true }),
     targetDate: t.field({ type: 'DateTime', required: true }),
-    inflationPct: t.float({ defaultValue: 32 }),
+    inflationPct: t.float(),
     monthlyContribution: t.float({ defaultValue: 0 }),
     tracking: t.field({ type: GoalTrackingInputType }),
   }),
@@ -216,6 +243,8 @@ builder.mutationField('createGoal', (t) =>
       const tracking = input.tracking ? CreateGoalTrackingInputSchema.parse(input.tracking) : null;
       const now = ctx.now();
       const targetPrice = tracking?.price ?? input.basePrice;
+      const inflationRate =
+        input.inflationPct ?? (await fetchLatestTuikInflationRate())?.annualRate ?? 32;
       const stats = await getGoalPlanStats(ctx);
       const plan = buildGoalSavingsPlan({
         targetPrice,
@@ -243,7 +272,7 @@ builder.mutationField('createGoal', (t) =>
           name: input.name,
           basePrice: input.basePrice,
           currentPrice: targetPrice,
-          inflationPct: input.inflationPct ?? 32,
+          inflationPct: inflationRate,
           targetDate: input.targetDate,
           current: 0,
           monthlyContribution: plan.suggestedMonthlyContribution,

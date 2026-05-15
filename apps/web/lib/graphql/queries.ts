@@ -252,6 +252,15 @@ export interface GoalPriceRefreshResult {
   alert: GoalPriceAlert | null;
 }
 
+export interface InflationRate {
+  annualRate: number;
+  monthlyRate: number | null;
+  period: string;
+  publishedAt: string;
+  source: string;
+  sourceUrl: string;
+}
+
 export interface FutureScore {
   id: string;
   score: number;
@@ -426,6 +435,11 @@ const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {
     remainingAmountImpact monthlySavingNeeded readAt createdAt
   }
 }`;
+const LATEST_INFLATION_RATE_Q = `query LatestInflationRate {
+  latestInflationRate {
+    annualRate monthlyRate period publishedAt source sourceUrl
+  }
+}`;
 const FUTURE_SCORE_Q = `query FutureScore {
   futureScore { id score contribution discipline consistency social computedAt }
 }`;
@@ -538,6 +552,14 @@ export const useGoalPriceAlerts = (unreadOnly = false) =>
         },
       ),
     staleTime: 30_000,
+  });
+
+export const useLatestInflationRate = () =>
+  useQuery({
+    queryKey: ['latestInflationRate'],
+    queryFn: () =>
+      gqlFetcher<{ latestInflationRate: InflationRate | null }, undefined>(LATEST_INFLATION_RATE_Q),
+    staleTime: 12 * 60 * 60 * 1000,
   });
 
 export const useFutureScore = () =>

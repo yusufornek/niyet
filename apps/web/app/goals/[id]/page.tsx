@@ -7,6 +7,7 @@ import { PhoneShell } from '@/components/phone-shell';
 import {
   useGoal,
   useGoalPriceAlerts,
+  useLatestInflationRate,
   useMarkGoalPriceAlertRead,
   useRefreshGoalTrackedPrice,
   useUpdateGoal,
@@ -18,6 +19,7 @@ export default function GoalDetailPage() {
   const params = useParams<{ id: string }>();
   const { data, isLoading } = useGoal(params.id);
   const { data: alertsData } = useGoalPriceAlerts(true);
+  const { data: inflationData } = useLatestInflationRate();
   const updateGoal = useUpdateGoal();
   const refreshPrice = useRefreshGoalTrackedPrice();
   const markAlertRead = useMarkGoalPriceAlertRead();
@@ -42,6 +44,8 @@ export default function GoalDetailPage() {
   const base = goal.basePrice;
   const currentPrice = goal.currentPrice;
   const inflation = goal.inflationPct;
+  const tuikInflation = inflationData?.latestInflationRate ?? null;
+  const effectiveInflation = tuikInflation?.annualRate ?? inflation;
   const monthly = goal.monthlyContribution;
   const history = goal.priceHistory ?? [
     { date: '', price: base },
@@ -206,21 +210,26 @@ export default function GoalDetailPage() {
 
       <div className="ny-card mb-4">
         <div className="flex items-center justify-between">
-          <div className="ny-eyebrow">Beklenen yıllık enflasyon</div>
-          <div className="text-sm font-semibold">%{Math.round(inflation)}</div>
+          <div className="ny-eyebrow">TÜİK yıllık TÜFE</div>
+          <div className="text-sm font-semibold">%{effectiveInflation.toFixed(2)}</div>
         </div>
         <input
           type="range"
           min={0}
           max={80}
-          value={inflation}
+          value={Math.round(effectiveInflation)}
           onChange={(e) =>
             updateGoal.mutate({ id: goal.id, input: { inflationPct: +e.target.value } })
           }
+          disabled={!!tuikInflation}
           className="mt-3 w-full accent-[hsl(var(--primary))]"
         />
         <div className="mt-1 text-xs opacity-60">
-          Hedef değeri yıllık %{Math.round(inflation)} artışla yeniden hesaplanır.
+          {tuikInflation
+            ? `${tuikInflation.period} bülteni, aylık ${
+                tuikInflation.monthlyRate?.toFixed(2) ?? '-'
+              }%. Hedef değeri yıllık %${effectiveInflation.toFixed(2)} artışla yeniden hesaplanır.`
+            : `Hedef değeri yıllık %${Math.round(inflation)} artışla yeniden hesaplanır.`}
         </div>
       </div>
 

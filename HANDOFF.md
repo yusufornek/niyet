@@ -152,6 +152,10 @@ Google AI Studio'da rate limit görülür. Kendi key'inle dev yap; prod key doku
 
 Önce `RAPIDAPI_KEY` ve `CRON_SECRET` env'lerini kontrol et. Manuel test için takipli bir hedef detayında "Fiyatı yenile" butonunu kullan. Otomatik kontrol Vercel cron ile `/api/cron/refresh-goal-prices` endpoint'ini çağırır; local'de aynı endpoint'e `Authorization: Bearer <CRON_SECRET>` header'ı ile istek atılabilir.
 
+### TÜİK enflasyon oranı güncellenmiyorsa
+
+Hedef detayındaki yıllık enflasyon kartı `latestInflationRate` GraphQL query'sinden beslenir. Backend, TÜİK resmi `https://data.tuik.gov.tr/api/tr/press` listesinden `Tüketici Fiyat Endeksi` bültenini bulur, detay endpoint'indeki yıllık/aylık TÜFE oranını parse eder ve sonucu 12 saat cache'ler. Dış kaynak geçici hata verirse query `null` döner ve UI hedefte kayıtlı enflasyon oranına düşer.
+
 ---
 
 ## 7. İletişim & Sorumluluklar

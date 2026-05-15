@@ -360,4 +360,27 @@ Hedef oluşturma akışı statik aylık katkı hesaplıyordu (`target / 120`). P
 **Pozitif**: Hesaplar deterministik ve test edilebilir; AI metin kalitesi katar; API kullanımı kontrollü kalır; mevcut realtime notification akışı yeniden kullanılır.
 **Negatif**: Gerçek fiyat servisinin sonucu değişken olabilir; real provider smoke test CI'a zorunlu bağlanmaz, staging/manual kontrol olarak kalır.
 
+## ADR-011: Hedef enflasyon varsayımı TÜİK TÜFE bülteninden beslenir
+
+**Tarih**: 2026-05-15
+**Durum**: Accepted
+**Karar verenler**: Yusuf, Codex
+**Revisit**: TÜİK Veri Portalı endpoint formatı değişirse
+
+### Bağlam
+
+Hedef detayında "Beklenen yıllık enflasyon" alanı kullanıcı veya mock veriyle kalabiliyordu; örnek hedefte `%9` görünmesi hedef planı için güvenilir değildi. Kullanıcı, bu oranın TÜİK'ten alınmasını istedi.
+
+### Karar
+
+- `latestInflationRate` GraphQL query'si TÜİK resmi `data.tuik.gov.tr/api/tr/press` listesinden `Tüketici Fiyat Endeksi` bültenini bulur.
+- Bülten detayı `api/tr/press/{id}` üzerinden alınır; yıllık ve aylık TÜFE oranı içerikten parse edilir.
+- Sonuç 12 saat server-side cache'lenir; hata halinde UI kayıtlı hedef oranına fallback yapar.
+- Yeni hedef oluştururken frontend TÜİK yıllık oranını gönderir; backend input gelmezse TÜİK cache'inden okuyup son çare `32` fallback kullanır.
+
+### Sonuçları
+
+**Pozitif**: Hedef ekranındaki enflasyon varsayımı güncel resmi bültene bağlandı; her render'da TÜİK'e istek atılmadığı için sistem yorulmaz.
+**Negatif**: TÜİK frontend API veya bülten metni formatı değişirse parser güncellenmelidir.
+
 <!-- Yeni ADR'lar buraya eklenir -->
