@@ -98,18 +98,12 @@ export class GoalTrackingService {
       throw new Error('Hedef bulunamadı veya erişim reddedildi.');
     }
 
-    if (!goal.normalizedQuery) {
-      return {
-        goal: await this.prisma.goal.findUniqueOrThrow({ where: { id: goal.id } }),
-        message: 'Bu hedefte fiyat takibi için ürün bilgisi eksik.',
-        alert: null,
-      };
-    }
+    const normalizedQuery = goal.normalizedQuery ?? goal.name;
 
     let match;
     try {
       match = await this.productSearch.refreshTrackedProductPrice({
-        normalizedQuery: goal.normalizedQuery,
+        normalizedQuery,
         selectedProductTitle: goal.selectedProductTitle,
         productUrl: goal.productUrl,
         productSource: goal.productSource,
@@ -151,6 +145,8 @@ export class GoalTrackingService {
         data: {
           currentPrice: newPrice,
           currency: match.currency,
+          rawQuery: goal.normalizedQuery ? undefined : goal.name,
+          normalizedQuery,
           selectedProductTitle: match.title,
           productUrl: match.url,
           productSource: match.source,

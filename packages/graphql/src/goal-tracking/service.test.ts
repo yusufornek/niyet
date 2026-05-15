@@ -58,6 +58,42 @@ describe('GoalTrackingService', () => {
     expect(result.message).toBe('Güncel fiyat değişmedi.');
     expect(notifications).toHaveLength(0);
   });
+
+  it('falls back to the goal name when tracking query is missing', async () => {
+    const seenQueries: string[] = [];
+    const prisma = fakePrisma({
+      oldPrice: 50000,
+      newPrice: 55000,
+      notifications: [],
+      alerts: [],
+      histories: [],
+      updates: [],
+      normalizedQuery: null,
+    });
+    const service = new GoalTrackingService({
+      prisma,
+      productSearch: {
+        searchProducts: async () => [],
+        refreshTrackedProductPrice: async (goal) => {
+          seenQueries.push(goal.normalizedQuery);
+          return {
+            title: 'Yeni telefon',
+            url: 'https://example.com/phone',
+            image: null,
+            source: 'Mock Store',
+            price: 55000,
+            currency: 'TRY',
+          };
+        },
+      },
+      queryNormalizer: { normalizeProductQuery: async () => null },
+      now: () => now,
+    });
+
+    await service.refreshPrice('user-1', 'goal-1');
+
+    expect(seenQueries).toEqual(['Yeni telefon']);
+  });
 });
 
 function fakeProductSearch(price: number) {
@@ -81,6 +117,7 @@ function fakePrisma(options: {
   alerts: unknown[];
   histories: unknown[];
   updates: unknown[];
+  normalizedQuery?: string | null;
 }) {
   const updatedGoal = {
     id: 'goal-1',
@@ -123,7 +160,8 @@ function fakePrisma(options: {
         id: 'goal-1',
         userId: 'user-1',
         name: 'Yeni telefon',
-        normalizedQuery: 'iphone 15 128 gb',
+        normalizedQuery:
+          options.normalizedQuery === undefined ? 'iphone 15 128 gb' : options.normalizedQuery,
         selectedProductTitle: 'iPhone 15 128 GB',
         productUrl: 'https://example.com/iphone',
         productSource: 'Mock Store',

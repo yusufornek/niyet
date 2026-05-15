@@ -158,7 +158,7 @@ export default function GoalDetailPage() {
           <div className="text-xs opacity-60">Fiyat geçmişi</div>
           <button
             onClick={() => refreshPrice.mutate(goal.id)}
-            disabled={refreshPrice.isPending || !goal.normalizedQuery}
+            disabled={refreshPrice.isPending}
             className="ny-chip"
           >
             <RefreshCw
