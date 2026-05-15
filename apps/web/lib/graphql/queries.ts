@@ -522,6 +522,12 @@ const LEARN_HOME_Q = `query LearnHome($date: DateTime) {
     }
   }
 }`;
+const LEARN_CARD_Q = `query LearnCard($id: ID!) {
+  learnCard(id: $id) {
+    id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+    quizItems { id question options explanation }
+  }
+}`;
 const LEARN_HISTORY_Q = `query LearnHistory($limit: Int) {
   learnHistory(limit: $limit) {
     packId packDate summary
@@ -680,6 +686,15 @@ export const useLearnHome = (date?: string | null) =>
         date: date ?? null,
       }),
     staleTime: 60_000,
+  });
+
+export const useLearnCard = (id: string) =>
+  useQuery({
+    queryKey: ['learnCard', id],
+    queryFn: () =>
+      gqlFetcher<{ learnCard: LearnCard | null }, { id: string }>(LEARN_CARD_Q, { id }),
+    staleTime: 60_000,
+    enabled: !!id,
   });
 
 export const useLearnHistory = (limit = 10) =>

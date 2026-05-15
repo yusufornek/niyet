@@ -371,7 +371,16 @@ export class LearnService {
         slug: 'bes-nedir',
         title: 'BES nedir?',
         shortDescription: 'Bireysel emeklilik sisteminin amacını 2 dakikada kavra.',
-        body: clipText(besText, 700),
+        body: buildPlainLessonTemplate({
+          topic: 'BES nedir?',
+          simpleDefinition:
+            'BES, çalışırken düzenli birikim yapıp emeklilik döneminde ek gelir oluşturmanı hedefleyen uzun vadeli bir sistemdir.',
+          userImpact:
+            'BES, emeklilik döneminde ek gelir için bugün küçük tutarlarla birikim yapmanı sağlar.',
+          dailyExample:
+            'Ayda 1.000 TL katkı payı ayırdığında, bütçene göre düzenli bir birikim disiplini kurarsın.',
+          nextStep: 'Bu hafta zorlamayacak bir tutar seç ve küçük bir başlangıç yap.',
+        }),
         sourceName: 'EGM',
         sourceUrl: besUrl,
         quiz: [
@@ -385,6 +394,16 @@ export class LearnService {
             correctIndex: 1,
             explanation: 'BES, uzun vadeli birikim ile emeklilikte ek gelir sağlamayı hedefler.',
           },
+          {
+            question: 'BES için en sağlıklı başlangıç yaklaşımı hangisidir?',
+            options: [
+              'Bütçeni zorlayacak yüksek tutarla başlamak',
+              'Sürdürülebilir küçük bir tutarla başlayıp düzeni korumak',
+              'Sadece kampanya dönemlerinde ödeme yapmak',
+            ],
+            correctIndex: 1,
+            explanation: 'Sürdürülebilir tutar, birikimde devamlılık sağlar.',
+          },
         ],
       },
       {
@@ -392,7 +411,21 @@ export class LearnService {
         slug: 'devlet-katkisi',
         title: 'Devlet katkısı nasıl işler?',
         shortDescription: 'Katkı payına karşılık devlet desteğinin temel mantığı.',
-        body: clipText(stateText, 700),
+        body: buildPlainLessonTemplate({
+          topic: 'Devlet katkısı nasıl işler?',
+          simpleDefinition:
+            'Devlet katkısı, BES’e yatırdığın katkı payına devletin belirli oranda ek destek vermesi modelidir.',
+          userImpact:
+            contributionPct != null
+              ? `Yatırdığın katkı payına ek olarak devlet tarafından %${contributionPct} oranında destek sağlanır.`
+              : 'Yatırdığın katkı payına ek olarak devlet desteği uygulanır.',
+          dailyExample:
+            contributionPct != null
+              ? `Ayda 1.000 TL yatırırsan, kurallar dahilinde 300 TL civarı ek destek hakkı oluşur.`
+              : 'Ayda 1.000 TL yatırdığında katkının üstüne ek destek hakkı oluşur.',
+          nextStep:
+            'Kendi katkı tutarını belirledikten sonra bu desteği uzun vadede nasıl büyüteceğine odaklan.',
+        }),
         sourceName: 'EGM',
         sourceUrl: stateContributionUrl,
         quiz: [
@@ -402,6 +435,16 @@ export class LearnService {
             correctIndex: contributionPct === 30 ? 2 : contributionPct === 10 ? 0 : 1,
             explanation: 'Oran resmi EGM içeriğinden güncel olarak çekilir.',
           },
+          {
+            question: 'Devlet katkısını en iyi nasıl değerlendirirsin?',
+            options: [
+              'Katkı payını düzensiz yatırarak',
+              'Sadece yılın son ayında ödeme yaparak',
+              'Uzun vadeli ve düzenli katkı planı oluşturarak',
+            ],
+            correctIndex: 2,
+            explanation: 'Düzenli ve uzun vadeli katkı, devlet desteğinin etkisini artırır.',
+          },
         ],
       },
       {
@@ -409,7 +452,16 @@ export class LearnService {
         slug: 'fon-kavramlari',
         title: 'Fon kavramları',
         shortDescription: 'BES fonlarının farklı risk/getiri profillerini öğren.',
-        body: clipText(fundsText, 700),
+        body: buildPlainLessonTemplate({
+          topic: 'Fon kavramları',
+          simpleDefinition:
+            'Fon, birikiminin değerlendirildiği yatırım sepetidir; her fonun risk ve getiri yapısı farklıdır.',
+          userImpact:
+            'Fon seçimi, birikimin dalgalanma seviyesini ve uzun vadeli getiri potansiyelini doğrudan etkiler.',
+          dailyExample:
+            'Kısa vadede dalgalanmadan rahatsız oluyorsan daha dengeli fonlarla başlayıp zamanla dağılımı güncelleyebilirsin.',
+          nextStep: 'Risk seviyeni belirle ve fon dağılımını yılda en az bir kez kontrol et.',
+        }),
         sourceName: 'EGM',
         sourceUrl: fundsUrl,
         quiz: [
@@ -418,6 +470,17 @@ export class LearnService {
             options: ['Risk tercihi ve vade', 'Sadece son 1 günlük fiyat', 'Rastgele seçim'],
             correctIndex: 0,
             explanation: 'Fon seçimi risk profili ve hedef vade ile uyumlu olmalıdır.',
+          },
+          {
+            question: 'Fon seçimini zamanla güncellemenin temel nedeni nedir?',
+            options: [
+              'Her gün rastgele fon değiştirmek',
+              'Risk profilin ve hedef süren değişebileceği için',
+              'Sadece arkadaş tavsiyesiyle hareket etmek',
+            ],
+            correctIndex: 1,
+            explanation:
+              'Hayat koşulları ve hedef vade değiştikçe fon dağılımı gözden geçirilmelidir.',
           },
         ],
       },
@@ -504,6 +567,22 @@ function cleanText(html: string): string {
 function clipText(value: string, maxLen: number): string {
   if (value.length <= maxLen) return value;
   return `${value.slice(0, maxLen - 1).trim()}…`;
+}
+
+function buildPlainLessonTemplate(input: {
+  topic: string;
+  simpleDefinition: string;
+  userImpact: string;
+  dailyExample: string;
+  nextStep: string;
+}): string {
+  const lines = [
+    `Nedir? ${input.simpleDefinition}`,
+    `Sana etkisi: ${input.userImpact}`,
+    `Mini örnek: ${input.dailyExample}`,
+    `Bugün adım: ${input.nextStep}`,
+  ];
+  return clipText(lines.join('\n\n'), 700);
 }
 
 function extractFirstPercent(text: string): number | null {
