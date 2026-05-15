@@ -156,6 +156,10 @@ Google AI Studio'da rate limit görülür. Kendi key'inle dev yap; prod key doku
 
 Hedef detayındaki yıllık enflasyon kartı `latestInflationRate` GraphQL query'sinden beslenir. Backend, TÜİK resmi `https://data.tuik.gov.tr/api/tr/press` listesinden `Tüketici Fiyat Endeksi` bültenini bulur, detay endpoint'indeki yıllık/aylık TÜFE oranını parse eder ve sonucu 12 saat cache'ler. Dış kaynak geçici hata verirse query `null` döner ve UI hedefte kayıtlı enflasyon oranına düşer.
 
+### Öğren modülü günlük içerik cron'u
+
+`/learn` artık statik değil; içerik `learnHome` GraphQL query'sinden gelir. Günlük paket üretimi için `GET /api/cron/refresh-learn-content` endpoint'i eklendi (`Authorization: Bearer <CRON_SECRET>`). Pipeline resmi kaynakları (EGM + TÜİK) çekip doğrular, hash aynıysa tekrar yayın yapmaz, yeni paket yayınlanınca `LEARN_UPDATE` bildirimi üretir.
+
 ---
 
 ## 7. İletişim & Sorumluluklar

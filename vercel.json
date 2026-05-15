@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/refresh-goal-prices",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-learn-content",
+      "schedule": "10 4 * * *"
     }
   ]
 }
