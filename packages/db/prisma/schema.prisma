@@ -81,6 +81,7 @@ enum NotificationType {
   GOAL_MILESTONE
   GOAL_PRICE_ALERT
   LEARN_UPDATE
+  FINANCE_NEWS_IMPORTANT
   AI_INSIGHT
   ANALYSIS_COMPLETE
   RULE_TRIGGERED
@@ -516,6 +517,22 @@ model LearnQuizItem {
   card LearnCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
+}
+
+model FinanceNewsItem {
+  id              String   @id @default(cuid())
+  title           String
+  summaryShort    String
+  sourceName      String
+  sourceUrl       String
+  publishedAt     DateTime
+  isImportant     Boolean  @default(false)
+  importanceScore Int      @default(0)
+  dedupeHash      String   @unique
+  createdAt       DateTime @default(now())
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([isImportant, publishedAt(sort: Desc)])
 }
 
 model UserLearnState {

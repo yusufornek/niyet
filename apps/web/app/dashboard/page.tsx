@@ -5,6 +5,7 @@ import {
   GraduationCap,
   History as HistoryIcon,
   ListChecks,
+  Newspaper,
   Pause,
   PiggyBank,
   Settings,
@@ -216,6 +217,7 @@ export default function DashboardPage() {
         <QuickTile icon={<Users size={18} />} label="Çemberler" href="/circles" />
         <QuickTile icon={<Pause size={18} />} label="Nefes ayı" href="/pause" />
         <QuickTile icon={<GraduationCap size={18} />} label="Öğren" href="/learn" />
+        <QuickTile icon={<Newspaper size={18} />} label="Haberler" href="/news" />
         <QuickTile icon={<TrendingUp size={18} />} label="Fonlar" href="/funds" />
       </div>
 

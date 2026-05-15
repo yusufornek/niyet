@@ -12,6 +12,18 @@
     {
       "path": "/api/cron/refresh-learn-content",
       "schedule": "10 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-finance-news",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-finance-news",
+      "schedule": "15 10 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-finance-news",
+      "schedule": "15 16 * * *"
     }
   ]
 }

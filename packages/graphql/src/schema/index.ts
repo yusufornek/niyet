@@ -15,6 +15,7 @@ import './analysis';
 import './micro-contribution';
 import './chat';
 import './learn';
+import './finance-news';
 
 import { builder } from '../builder';
 

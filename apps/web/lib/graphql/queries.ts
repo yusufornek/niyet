@@ -37,6 +37,7 @@ export type NotificationType =
   | 'GOAL_MILESTONE'
   | 'GOAL_PRICE_ALERT'
   | 'LEARN_UPDATE'
+  | 'FINANCE_NEWS_IMPORTANT'
   | 'AI_INSIGHT'
   | 'ANALYSIS_COMPLETE'
   | 'RULE_TRIGGERED'
@@ -366,6 +367,17 @@ export interface LearnHome {
   leaderboard: LearnLeaderboardEntry[];
 }
 
+export interface FinanceNewsItem {
+  id: string;
+  title: string;
+  summaryShort: string;
+  sourceName: string;
+  sourceUrl: string;
+  publishedAt: string;
+  isImportant: boolean;
+  importanceScore: number;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Query string'leri
 // ─────────────────────────────────────────────────────────────
@@ -539,6 +551,16 @@ const LEARN_HISTORY_Q = `query LearnHistory($limit: Int) {
     }
   }
 }`;
+const FINANCE_NEWS_FEED_Q = `query FinanceNewsFeed($limit: Int, $importantOnly: Boolean) {
+  financeNewsFeed(limit: $limit, importantOnly: $importantOnly) {
+    id title summaryShort sourceName sourceUrl publishedAt isImportant importanceScore
+  }
+}`;
+const FINANCE_NEWS_ITEM_Q = `query FinanceNewsItem($id: ID!) {
+  financeNewsItem(id: $id) {
+    id title summaryShort sourceName sourceUrl publishedAt isImportant importanceScore
+  }
+}`;
 
 // ─────────────────────────────────────────────────────────────
 // Hooks — TanStack Query
@@ -703,6 +725,28 @@ export const useLearnHistory = (limit = 10) =>
     queryFn: () =>
       gqlFetcher<{ learnHistory: LearnHome[] }, { limit: number }>(LEARN_HISTORY_Q, { limit }),
     staleTime: 60_000,
+  });
+
+export const useFinanceNewsFeed = (limit = 20, importantOnly = false) =>
+  useQuery({
+    queryKey: ['financeNewsFeed', limit, importantOnly],
+    queryFn: () =>
+      gqlFetcher<{ financeNewsFeed: FinanceNewsItem[] }, { limit: number; importantOnly: boolean }>(
+        FINANCE_NEWS_FEED_Q,
+        { limit, importantOnly },
+      ),
+    staleTime: 60_000,
+  });
+
+export const useFinanceNewsItem = (id: string) =>
+  useQuery({
+    queryKey: ['financeNewsItem', id],
+    queryFn: () =>
+      gqlFetcher<{ financeNewsItem: FinanceNewsItem | null }, { id: string }>(FINANCE_NEWS_ITEM_Q, {
+        id,
+      }),
+    staleTime: 60_000,
+    enabled: !!id,
   });
 
 export const useMicroContributions = (
