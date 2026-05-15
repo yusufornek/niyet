@@ -8,16 +8,9 @@ import type { GraphQLContext } from '../context';
 import { RulesService } from '../rules/service';
 import { RuleFrequencyRef } from './enums';
 
-const RuleRef = builder.prismaObject('Rule', {
-  fields: (t) => ({
-    id: t.exposeID('id'),
-    label: t.exposeString('label'),
-    amount: t.field({ type: 'NonNegativeFloat', resolve: (r) => Number(r.amount) }),
-    frequency: t.field({ type: RuleFrequencyRef, resolve: (r) => r.frequency }),
-    active: t.exposeBoolean('active'),
-    createdAt: t.field({ type: 'DateTime', resolve: (r) => r.createdAt }),
-  }),
-});
+// NOTE: Rule prismaObject ve Query.rules zaten schema/account.ts:29-52 içinde
+// tanımlı. Buradan re-register etmek "Duplicate field" Pothos hatasına yol
+// açıyor. Mutation'lar için Rule'a 'Rule' string referansı ile erişiyoruz.
 
 const RuleTriggerResultRef = builder
   .objectRef<{
@@ -74,22 +67,15 @@ function serviceFromContext(ctx: GraphQLContext) {
   return new RulesService({ prisma: ctx.prisma, now: ctx.now });
 }
 
-builder.queryField('rules', (t) =>
-  t.prismaField({
-    type: [RuleRef],
-    authScopes: { authenticated: true },
-    resolve: (query, _root, _args, ctx) =>
-      ctx.prisma.rule.findMany({
-        ...query,
-        where: { userId: ctx.userId! },
-        orderBy: { createdAt: 'desc' },
-      }),
-  }),
-);
+// NOTE: Query.rules zaten schema/account.ts:40 içinde tanımlanmış (RuleRef
+// üzerinde aynı resolver: kullanıcının tüm kuralları). Burada tekrar
+// kaydetmek Pothos "Duplicate field rules on Query" hatasına yol açıyor.
+// Mutations (createRule, updateRule, deleteRule, triggerRule) buraya ait;
+// query account.ts'ten gelir.
 
 builder.mutationField('createRule', (t) =>
   t.prismaField({
-    type: RuleRef,
+    type: 'Rule',
     authScopes: { authenticated: true },
     args: { input: t.arg({ type: CreateRuleInputType, required: true }) },
     resolve: async (query, _root, args, ctx) => {
@@ -102,7 +88,7 @@ builder.mutationField('createRule', (t) =>
 
 builder.mutationField('updateRule', (t) =>
   t.prismaField({
-    type: RuleRef,
+    type: 'Rule',
     authScopes: { authenticated: true },
     args: {
       ruleId: t.arg.id({ required: true }),
