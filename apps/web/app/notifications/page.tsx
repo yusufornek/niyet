@@ -74,15 +74,17 @@ export default function NotificationsPage() {
         <div className="mb-5 space-y-3">
           {items.map((i) => {
             const targetHref =
-              i.type === 'ANALYSIS_COMPLETE' || i.type === 'AI_INSIGHT'
-                ? '/history'
-                : i.type === 'CONTRIBUTION_ACCEPTED'
-                  ? '/contributions'
-                  : i.type === 'GOAL_MILESTONE'
-                    ? '/goals'
-                    : i.type === 'RULE_TRIGGERED'
-                      ? '/rule'
-                      : null;
+              i.type === 'GOAL_PRICE_ALERT'
+                ? goalAlertHref(i.payload)
+                : i.type === 'ANALYSIS_COMPLETE' || i.type === 'AI_INSIGHT'
+                  ? '/history'
+                  : i.type === 'CONTRIBUTION_ACCEPTED'
+                    ? '/contributions'
+                    : i.type === 'GOAL_MILESTONE'
+                      ? '/goals'
+                      : i.type === 'RULE_TRIGGERED'
+                        ? '/rule'
+                        : null;
             const handleClick = () => {
               if (!i.read) markRead.mutate(i.id);
               if (targetHref) router.push(targetHref);
@@ -145,4 +147,13 @@ export default function NotificationsPage() {
       </Link>
     </PhoneShell>
   );
+}
+
+function goalAlertHref(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return '/goals';
+  }
+
+  const goalId = (payload as { goalId?: unknown }).goalId;
+  return typeof goalId === 'string' && goalId.length > 0 ? `/goals/${goalId}` : '/goals';
 }

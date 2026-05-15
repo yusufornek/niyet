@@ -10,7 +10,12 @@
  * açılır; DB'de matching User olmadığı için Ayşe persona'sı görünür.
  */
 import { prisma } from '@niyet/db';
-import { GeminiQueryRewriteAdapter, type ProductQueryRewriteAdapter } from '@niyet/ai';
+import {
+  GeminiGoalPlanNarrator,
+  GeminiQueryRewriteAdapter,
+  type GoalPlanNarrator,
+  type ProductQueryRewriteAdapter,
+} from '@niyet/ai';
 import { RapidApiProductSearchProvider } from './goal-tracking/rapidapi';
 import type { ProductSearchProvider } from './goal-tracking/product-search';
 
@@ -22,6 +27,7 @@ export interface GraphQLContext {
   authId: string | null;
   productSearch: ProductSearchProvider;
   queryNormalizer: ProductQueryRewriteAdapter;
+  goalPlanNarrator: GoalPlanNarrator;
   now: () => Date;
 }
 
@@ -30,6 +36,7 @@ export interface CreateContextOptions {
   authUserId?: string | null;
   productSearch?: ProductSearchProvider;
   queryNormalizer?: ProductQueryRewriteAdapter;
+  goalPlanNarrator?: GoalPlanNarrator;
   now?: () => Date;
 }
 
@@ -37,6 +44,7 @@ export async function createContext(opts: CreateContextOptions = {}): Promise<Gr
   const authId = opts.authUserId ?? null;
   const productSearch = opts.productSearch ?? new RapidApiProductSearchProvider();
   const queryNormalizer = opts.queryNormalizer ?? new GeminiQueryRewriteAdapter();
+  const goalPlanNarrator = opts.goalPlanNarrator ?? new GeminiGoalPlanNarrator();
   const now = opts.now ?? (() => new Date());
 
   if (authId) {
@@ -44,7 +52,16 @@ export async function createContext(opts: CreateContextOptions = {}): Promise<Gr
       where: { authId },
       select: { id: true },
     });
-    if (user) return { prisma, userId: user.id, authId, productSearch, queryNormalizer, now };
+    if (user)
+      return {
+        prisma,
+        userId: user.id,
+        authId,
+        productSearch,
+        queryNormalizer,
+        goalPlanNarrator,
+        now,
+      };
   }
 
   // Ayşe fallback — demo aşamasında shared persona
@@ -58,6 +75,7 @@ export async function createContext(opts: CreateContextOptions = {}): Promise<Gr
     authId,
     productSearch,
     queryNormalizer,
+    goalPlanNarrator,
     now,
   };
 }

@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
 import {
   calculateMonthlySavingNeeded,
+  calculateNextPriceCheckAt,
+  calculatePriceCheckBackoffUntil,
   calculateRemainingAmount,
   checkSignificantPriceChange,
   normalizeProductQuery,
@@ -16,6 +18,17 @@ export interface PriceRefreshResult {
   goal: Awaited<ReturnType<PrismaClient['goal']['update']>>;
   message: string | null;
   alert: Awaited<ReturnType<PrismaClient['goalPriceAlert']['create']>> | null;
+}
+
+export interface PriceRefreshOptions {
+  source?: 'manual' | 'cron';
+}
+
+export interface PriceRefreshBatchResult {
+  checked: number;
+  updated: number;
+  alerts: number;
+  failed: number;
 }
 
 export interface GoalTrackingServiceDependencies {
@@ -58,11 +71,17 @@ export class GoalTrackingService {
     return this.productSearch.searchProducts(query);
   }
 
-  async refreshPrice(userId: string, goalId: string): Promise<PriceRefreshResult> {
+  async refreshPrice(
+    userId: string,
+    goalId: string,
+    options: PriceRefreshOptions = {},
+  ): Promise<PriceRefreshResult> {
     const goal = await this.prisma.goal.findFirst({
       where: { id: goalId, userId },
       select: {
         id: true,
+        userId: true,
+        name: true,
         normalizedQuery: true,
         selectedProductTitle: true,
         productUrl: true,
@@ -71,6 +90,7 @@ export class GoalTrackingService {
         currentPrice: true,
         current: true,
         targetDate: true,
+        priceCheckFailureCount: true,
       },
     });
 
@@ -78,24 +98,19 @@ export class GoalTrackingService {
       throw new Error('Hedef bulunamadı veya erişim reddedildi.');
     }
 
-    if (!goal.normalizedQuery) {
-      return {
-        goal: await this.prisma.goal.findUniqueOrThrow({ where: { id: goal.id } }),
-        message: 'Bu hedefte fiyat takibi için ürün bilgisi eksik.',
-        alert: null,
-      };
-    }
+    const normalizedQuery = goal.normalizedQuery ?? goal.name;
 
     let match;
     try {
       match = await this.productSearch.refreshTrackedProductPrice({
-        normalizedQuery: goal.normalizedQuery,
+        normalizedQuery,
         selectedProductTitle: goal.selectedProductTitle,
         productUrl: goal.productUrl,
         productSource: goal.productSource,
       });
     } catch (error) {
       if (error instanceof ProductSearchError) {
+        await this.recordRefreshFailure(goal.id, goal.priceCheckFailureCount);
         return {
           goal: await this.prisma.goal.findUniqueOrThrow({ where: { id: goal.id } }),
           message: friendlyProductSearchError(error),
@@ -106,6 +121,7 @@ export class GoalTrackingService {
     }
 
     if (!match) {
+      await this.recordRefreshFailure(goal.id, goal.priceCheckFailureCount);
       return {
         goal: await this.prisma.goal.findUniqueOrThrow({ where: { id: goal.id } }),
         message: 'Seçili ürün için güncel fiyat bulunamadı. Daha sonra tekrar deneyebilirsin.',
@@ -116,55 +132,139 @@ export class GoalTrackingService {
     const now = this.now();
     const oldPrice = moneyToNumber(goal.currentPrice);
     const newPrice = match.price;
-
-    const updatedGoal = await this.prisma.goal.update({
-      where: { id: goal.id },
-      data: {
-        currentPrice: newPrice,
-        currency: match.currency,
-        productSource: match.source,
-        productImage: match.image,
-        lastCheckedAt: now,
-      },
-    });
-
-    await this.prisma.goalPriceHistory.create({
-      data: {
-        goalId: goal.id,
-        checkedAt: now,
-        price: newPrice,
-        currency: match.currency,
-        source: match.source,
-      },
-    });
-
     const significantChange = checkSignificantPriceChange(oldPrice, newPrice);
-    const alert = significantChange
-      ? await this.prisma.goalPriceAlert.create({
-          data: {
+    const monthlySavingNeeded = calculateMonthlySavingNeeded(
+      calculateRemainingAmount(moneyToNumber(goal.current), newPrice),
+      goal.targetDate,
+      now,
+    );
+
+    const [updatedGoal, alert] = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.goal.update({
+        where: { id: goal.id },
+        data: {
+          currentPrice: newPrice,
+          currency: match.currency,
+          rawQuery: goal.normalizedQuery ? undefined : goal.name,
+          normalizedQuery,
+          selectedProductTitle: match.title,
+          productUrl: match.url,
+          productSource: match.source,
+          productImage: match.image,
+          lastCheckedAt: now,
+          nextPriceCheckAt: calculateNextPriceCheckAt(goal.targetDate, now),
+          priceCheckFailureCount: 0,
+          priceCheckPausedUntil: null,
+        },
+      });
+
+      await tx.goalPriceHistory.create({
+        data: {
+          goalId: goal.id,
+          checkedAt: now,
+          price: newPrice,
+          currency: match.currency,
+          source: match.source,
+        },
+      });
+
+      if (!significantChange) {
+        return [updated, null] as const;
+      }
+
+      const createdAlert = await tx.goalPriceAlert.create({
+        data: {
+          goalId: goal.id,
+          oldPrice,
+          newPrice,
+          percentageChange: significantChange.percentageChange,
+          direction: significantChange.direction,
+          remainingAmountImpact: roundMoney(
+            calculateRemainingAmount(moneyToNumber(goal.current), newPrice) -
+              calculateRemainingAmount(moneyToNumber(goal.current), oldPrice),
+          ),
+          monthlySavingNeeded,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: goal.userId,
+          type: 'GOAL_PRICE_ALERT',
+          title:
+            significantChange.direction === 'INCREASE'
+              ? 'Hedef fiyatı arttı'
+              : 'Hedef fiyatı düştü',
+          body: `${goal.name} hedefi ${Math.round(Math.abs(significantChange.percentageChange) * 100)}% ${significantChange.direction === 'INCREASE' ? 'arttı' : 'düştü'}. Gerekli aylık katkı: ${Math.round(monthlySavingNeeded)} TL.`,
+          payload: {
             goalId: goal.id,
+            alertId: createdAlert.id,
             oldPrice,
             newPrice,
             percentageChange: significantChange.percentageChange,
             direction: significantChange.direction,
-            remainingAmountImpact: roundMoney(
-              calculateRemainingAmount(moneyToNumber(goal.current), newPrice) -
-                calculateRemainingAmount(moneyToNumber(goal.current), oldPrice),
-            ),
-            monthlySavingNeeded: calculateMonthlySavingNeeded(
-              calculateRemainingAmount(moneyToNumber(goal.current), newPrice),
-              goal.targetDate,
-              now,
-            ),
+            source: options.source ?? 'manual',
           },
-        })
-      : null;
+        },
+      });
+
+      return [updated, createdAlert] as const;
+    });
 
     return {
       goal: updatedGoal,
       message: oldPrice === newPrice ? 'Güncel fiyat değişmedi.' : null,
       alert,
     };
+  }
+
+  async refreshDuePrices(limit = 20, concurrency = 2): Promise<PriceRefreshBatchResult> {
+    const now = this.now();
+    const goals = await this.prisma.goal.findMany({
+      where: {
+        status: 'ACTIVE',
+        autoUpdate: true,
+        normalizedQuery: { not: null },
+        OR: [{ nextPriceCheckAt: null }, { nextPriceCheckAt: { lte: now } }],
+        AND: [
+          {
+            OR: [{ priceCheckPausedUntil: null }, { priceCheckPausedUntil: { lte: now } }],
+          },
+        ],
+      },
+      select: { id: true, userId: true },
+      orderBy: [{ nextPriceCheckAt: 'asc' }, { createdAt: 'asc' }],
+      take: limit,
+    });
+
+    const result: PriceRefreshBatchResult = {
+      checked: goals.length,
+      updated: 0,
+      alerts: 0,
+      failed: 0,
+    };
+
+    await runWithConcurrency(goals, Math.max(1, concurrency), async (goal) => {
+      try {
+        const refresh = await this.refreshPrice(goal.userId, goal.id, { source: 'cron' });
+        if (refresh.message) {
+          if (refresh.message === 'Güncel fiyat değişmedi.') {
+            result.updated += 1;
+            return;
+          }
+          result.failed += 1;
+          return;
+        }
+        result.updated += 1;
+        if (refresh.alert) {
+          result.alerts += 1;
+        }
+      } catch {
+        result.failed += 1;
+      }
+    });
+
+    return result;
   }
 
   async markAlertRead(userId: string, alertId: string) {
@@ -184,6 +284,39 @@ export class GoalTrackingService {
       data: { readAt: this.now() },
     });
   }
+
+  private async recordRefreshFailure(goalId: string, currentFailureCount: number) {
+    const now = this.now();
+    const failureCount = currentFailureCount + 1;
+    const pausedUntil = calculatePriceCheckBackoffUntil(failureCount, now);
+
+    await this.prisma.goal.update({
+      where: { id: goalId },
+      data: {
+        priceCheckFailureCount: failureCount,
+        priceCheckPausedUntil: pausedUntil,
+        nextPriceCheckAt: pausedUntil,
+      },
+    });
+  }
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+) {
+  let index = 0;
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const item = items[index];
+      index += 1;
+      if (item) {
+        await worker(item);
+      }
+    }
+  });
+  await Promise.all(runners);
 }
 
 function friendlyProductSearchError(error: ProductSearchError): string {

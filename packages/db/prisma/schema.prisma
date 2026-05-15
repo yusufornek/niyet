@@ -79,6 +79,7 @@ enum CircleType {
 enum NotificationType {
   SPENDING_ALERT
   GOAL_MILESTONE
+  GOAL_PRICE_ALERT
   AI_INSIGHT
   ANALYSIS_COMPLETE
   RULE_TRIGGERED
@@ -112,42 +113,42 @@ enum ContributionStatus {
 // ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
+  id                String    @id @default(cuid())
   /// Supabase Auth user id (auth.users.id ile aynı). RLS policies bunu kullanır.
-  authId        String?  @unique
-  email         String   @unique
-  name          String
-  age           Int
-  monthlyIncome Decimal  @db.Money
+  authId            String?   @unique
+  email             String    @unique
+  name              String
+  age               Int
+  monthlyIncome     Decimal   @db.Money
   consentAcceptedAt DateTime?
   consentVersion    String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  accounts            Account[]
-  bankConnections     BankConnection[]
-  transactions        Transaction[]
-  subscriptions       Subscription[]
-  goals               Goal[]
-  rules               Rule[]
-  circleMemberships   CircleMembership[]
-  notifications       Notification[]
-  futureScores        FutureScoreSnapshot[]
-  analysisRuns        AnalysisRun[]
-  microContributions  MicroContribution[]
-  chatSessions        ChatSession[]
+  accounts           Account[]
+  bankConnections    BankConnection[]
+  transactions       Transaction[]
+  subscriptions      Subscription[]
+  goals              Goal[]
+  rules              Rule[]
+  circleMemberships  CircleMembership[]
+  notifications      Notification[]
+  futureScores       FutureScoreSnapshot[]
+  analysisRuns       AnalysisRun[]
+  microContributions MicroContribution[]
+  chatSessions       ChatSession[]
 
   @@index([authId])
 }
 
 model BankConnection {
-  id          String   @id @default(cuid())
-  userId      String
+  id             String    @id @default(cuid())
+  userId         String
   /// "Garanti BBVA", "İş Bankası", "Akbank", "Yapı Kredi", "Ziraat"
-  bankName    String
-  connectedAt DateTime @default(now())
+  bankName       String
+  connectedAt    DateTime  @default(now())
   disconnectedAt DateTime?
-  active      Boolean  @default(true)
+  active         Boolean   @default(true)
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accounts Account[]
@@ -156,18 +157,18 @@ model BankConnection {
 }
 
 model Account {
-  id          String      @id @default(cuid())
-  userId      String
-  bankConnId  String
-  type        AccountType
+  id         String      @id @default(cuid())
+  userId     String
+  bankConnId String
+  type       AccountType
   /// Son 4 rakam (gerçek kart no asla saklanmaz)
-  last4       String
+  last4      String
   /// Hesap takma adı: "Maaş hesabı", "Birikim", vs.
-  nickname    String?
-  balance     Decimal     @db.Money
+  nickname   String?
+  balance    Decimal     @db.Money
 
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bankConn     BankConnection   @relation(fields: [bankConnId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankConn     BankConnection @relation(fields: [bankConnId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 
   @@index([userId])
@@ -195,12 +196,12 @@ model Transaction {
   rawData        Json?
 
   /// Kullanıcı bu transaction'ın fırsatını mikro katkıya dönüştürdüyse buradadır
-  acceptedContributionId String?           @unique
+  acceptedContributionId String? @unique
 
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account             Account               @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  transactionAnalyses TransactionAnalysis[]
-  acceptedContribution MicroContribution?   @relation(fields: [acceptedContributionId], references: [id], onDelete: SetNull)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account               @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactionAnalyses  TransactionAnalysis[]
+  acceptedContribution MicroContribution?    @relation(fields: [acceptedContributionId], references: [id], onDelete: SetNull)
 
   @@index([userId, occurredAt])
   @@index([userId, category])
@@ -208,14 +209,14 @@ model Transaction {
 }
 
 model Subscription {
-  id            String              @id @default(cuid())
-  userId        String
-  name          String
-  amount        Decimal             @db.Money
-  frequency     RuleFrequency
-  status        SubscriptionStatus  @default(ACTIVE)
-  detectedAt    DateTime            @default(now())
-  lastChargedAt DateTime?
+  id              String             @id @default(cuid())
+  userId          String
+  name            String
+  amount          Decimal            @db.Money
+  frequency       RuleFrequency
+  status          SubscriptionStatus @default(ACTIVE)
+  detectedAt      DateTime           @default(now())
+  lastChargedAt   DateTime?
   /// İlişkili merchant pattern (kullanıcı 'Netflix' tx'lerini takip etmek için)
   merchantPattern String?
 
@@ -253,7 +254,7 @@ model AnalysisRun {
 }
 
 model TransactionAnalysis {
-  id            String           @id @default(cuid())
+  id            String @id @default(cuid())
   runId         String
   transactionId String
 
@@ -275,35 +276,40 @@ model TransactionAnalysis {
 // ─────────────────────────────────────────────────────────────
 
 model Goal {
-  id                  String     @id @default(cuid())
-  userId              String
+  id                     String     @id @default(cuid())
+  userId                 String
   /// "Yeni laptop", "Ev peşinatı", "Emeklilik birikimi"
-  name                String
-  basePrice           Decimal    @db.Money
-  currentPrice        Decimal    @db.Money
-  inflationPct        Decimal    @db.Decimal(5, 2)
-  targetDate          DateTime
-  current             Decimal    @default(0) @db.Money
-  monthlyContribution Decimal    @db.Money
-  status              GoalStatus @default(ACTIVE)
+  name                   String
+  basePrice              Decimal    @db.Money
+  currentPrice           Decimal    @db.Money
+  inflationPct           Decimal    @db.Decimal(5, 2)
+  targetDate             DateTime
+  current                Decimal    @default(0) @db.Money
+  monthlyContribution    Decimal    @db.Money
+  status                 GoalStatus @default(ACTIVE)
   /// [{ date, price }] formatında price tracking
-  priceHistory        Json?
+  priceHistory           Json?
   /// Goal tracking ürün sorgusunun ham hali
-  rawQuery            String?
+  rawQuery               String?
   /// Goal tracking normalize edilmiş ürün sorgusu
-  normalizedQuery     String?
-  category            String?
-  selectedProductTitle String?
-  productUrl          String?
-  productImage        String?
-  productSource       String?
-  currency            String     @default("TRY")
-  lastCheckedAt       DateTime?
+  normalizedQuery        String?
+  category               String?
+  selectedProductTitle   String?
+  productUrl             String?
+  productImage           String?
+  productSource          String?
+  currency               String     @default("TRY")
+  lastCheckedAt          DateTime?
+  nextPriceCheckAt       DateTime?
+  priceCheckFailureCount Int        @default(0)
+  priceCheckPausedUntil  DateTime?
   /// Goal Forecasting Agent (Pattern C) için context
-  coachContext        String?
-  autoUpdate          Boolean    @default(true)
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  coachContext           String?
+  planSummary            String?
+  planGeneratedAt        DateTime?
+  autoUpdate             Boolean    @default(true)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   checkpoints        GoalCheckpoint[]
@@ -435,18 +441,18 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id        String    @id @default(cuid())
-  sessionId String
-  role      ChatRole
+  id          String   @id @default(cuid())
+  sessionId   String
+  role        ChatRole
   /// USER: kullanıcı metni. ASSISTANT: Gemini cevabı. TOOL: function result.
-  content   String
+  content     String
   /// Function call yapıldıysa hangi tool (set_category, recommend_subscription_to_cancel, vs.)
-  toolName  String?
+  toolName    String?
   /// Tool arg veya result JSON
   toolPayload Json?
   /// Bu mesaj için Gemini'nin harcadığı token sayısı (ASSISTANT için)
-  tokensUsed Int?
-  createdAt DateTime  @default(now())
+  tokensUsed  Int?
+  createdAt   DateTime @default(now())
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -458,30 +464,30 @@ model ChatMessage {
 // ─────────────────────────────────────────────────────────────
 
 model MicroContribution {
-  id              String              @id @default(cuid())
-  userId          String
-  amount          Decimal             @db.Money
+  id          String             @id @default(cuid())
+  userId      String
+  amount      Decimal            @db.Money
   /// Hangi kategoriden geldiği (analitik için; null = MANUAL)
-  category        SpendingCategory?
-  source          ContributionSource
-  status          ContributionStatus  @default(PENDING)
+  category    SpendingCategory?
+  source      ContributionSource
+  status      ContributionStatus @default(PENDING)
   /// Polymorphic kaynak: REDUCIBLE_TRANSACTION -> Transaction.id; CATEGORY_BUCKET -> category enum;
   /// RULE_TRIGGERED -> Rule.id. MANUAL'da null.
-  sourceRef       String?
+  sourceRef   String?
   /// İlişkili goal (varsa; kullanıcı katkıyı belirli hedefe yönlendirdiyse)
-  goalId          String?
+  goalId      String?
   /// İlişkili rule (RULE_TRIGGERED için)
-  ruleId          String?
+  ruleId      String?
   /// Kullanıcı notu / etiket
-  note            String?
-  createdAt       DateTime            @default(now())
-  committedAt     DateTime?
-  reversedAt      DateTime?
+  note        String?
+  createdAt   DateTime           @default(now())
+  committedAt DateTime?
+  reversedAt  DateTime?
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transaction    Transaction?
-  goal           Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  rule           Rule?         @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  goal        Goal?        @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  rule        Rule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([userId, status])

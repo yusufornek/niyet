@@ -7,6 +7,7 @@ import { PhoneShell } from '@/components/phone-shell';
 import {
   useGoal,
   useGoalPriceAlerts,
+  useLatestInflationRate,
   useMarkGoalPriceAlertRead,
   useRefreshGoalTrackedPrice,
   useUpdateGoal,
@@ -18,6 +19,7 @@ export default function GoalDetailPage() {
   const params = useParams<{ id: string }>();
   const { data, isLoading } = useGoal(params.id);
   const { data: alertsData } = useGoalPriceAlerts(true);
+  const { data: inflationData } = useLatestInflationRate();
   const updateGoal = useUpdateGoal();
   const refreshPrice = useRefreshGoalTrackedPrice();
   const markAlertRead = useMarkGoalPriceAlertRead();
@@ -42,6 +44,8 @@ export default function GoalDetailPage() {
   const base = goal.basePrice;
   const currentPrice = goal.currentPrice;
   const inflation = goal.inflationPct;
+  const tuikInflation = inflationData?.latestInflationRate ?? null;
+  const effectiveInflation = tuikInflation?.annualRate ?? inflation;
   const monthly = goal.monthlyContribution;
   const history = goal.priceHistory ?? [
     { date: '', price: base },
@@ -118,6 +122,18 @@ export default function GoalDetailPage() {
         </div>
       </div>
 
+      {goal.planSummary && (
+        <div className="ny-card mb-4">
+          <div className="ny-eyebrow mb-2">Kişisel tasarruf planı</div>
+          <p className="text-sm leading-relaxed opacity-80">{goal.planSummary}</p>
+          {goal.planGeneratedAt && (
+            <div className="mt-2 text-xs opacity-50">
+              Plan tarihi: {new Date(goal.planGeneratedAt).toLocaleString('tr-TR')}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="ny-card mb-4">
         <div className="mb-2 flex items-center justify-between">
           <div>
@@ -126,6 +142,12 @@ export default function GoalDetailPage() {
             {goal.lastCheckedAt && (
               <div className="mt-1 text-xs opacity-60">
                 Son kontrol: {new Date(goal.lastCheckedAt).toLocaleString('tr-TR')}
+              </div>
+            )}
+            {goal.nextPriceCheckAt && (
+              <div className="mt-1 text-xs opacity-60">
+                Sonraki otomatik kontrol:{' '}
+                {new Date(goal.nextPriceCheckAt).toLocaleDateString('tr-TR')}
               </div>
             )}
           </div>
@@ -139,11 +161,17 @@ export default function GoalDetailPage() {
         <div className="mt-2 flex items-center justify-between">
           <div className="text-xs opacity-60">Fiyat geçmişi</div>
           <button
-            onClick={() => refreshPrice.mutate(goal.id)}
-            disabled={refreshPrice.isPending || !goal.normalizedQuery}
+            onClick={() => {
+              if (refreshPrice.isPending) return;
+              refreshPrice.mutate(goal.id);
+            }}
+            aria-disabled={refreshPrice.isPending}
             className="ny-chip"
           >
-            <RefreshCw size={14} className={`mr-1 inline ${refreshPrice.isPending ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              size={14}
+              className={`mr-1 inline ${refreshPrice.isPending ? 'animate-spin' : ''}`}
+            />
             Fiyatı yenile
           </button>
         </div>
@@ -159,7 +187,9 @@ export default function GoalDetailPage() {
                   <span className="font-semibold">
                     {alert.direction === 'INCREASE' ? 'Fiyat arttı' : 'Fiyat düştü'}
                   </span>
-                  <span className={alert.direction === 'INCREASE' ? 'text-amber-600' : 'text-primary'}>
+                  <span
+                    className={alert.direction === 'INCREASE' ? 'text-amber-600' : 'text-primary'}
+                  >
                     %{Math.round(Math.abs(alert.percentageChange) * 100)}
                   </span>
                 </div>
@@ -180,19 +210,26 @@ export default function GoalDetailPage() {
 
       <div className="ny-card mb-4">
         <div className="flex items-center justify-between">
-          <div className="ny-eyebrow">Beklenen yıllık enflasyon</div>
-          <div className="text-sm font-semibold">%{Math.round(inflation)}</div>
+          <div className="ny-eyebrow">TÜİK yıllık TÜFE</div>
+          <div className="text-sm font-semibold">%{effectiveInflation.toFixed(2)}</div>
         </div>
         <input
           type="range"
           min={0}
           max={80}
-          value={inflation}
-          onChange={(e) => updateGoal.mutate({ id: goal.id, input: { inflationPct: +e.target.value } })}
+          value={Math.round(effectiveInflation)}
+          onChange={(e) =>
+            updateGoal.mutate({ id: goal.id, input: { inflationPct: +e.target.value } })
+          }
+          disabled={!!tuikInflation}
           className="mt-3 w-full accent-[hsl(var(--primary))]"
         />
         <div className="mt-1 text-xs opacity-60">
-          Hedef değeri yıllık %{Math.round(inflation)} artışla yeniden hesaplanır.
+          {tuikInflation
+            ? `${tuikInflation.period} bülteni, aylık ${
+                tuikInflation.monthlyRate?.toFixed(2) ?? '-'
+              }%. Hedef değeri yıllık %${effectiveInflation.toFixed(2)} artışla yeniden hesaplanır.`
+            : `Hedef değeri yıllık %${Math.round(inflation)} artışla yeniden hesaplanır.`}
         </div>
       </div>
 
@@ -202,9 +239,13 @@ export default function GoalDetailPage() {
           {scenarios.map((s, i) => (
             <button
               key={s.label}
-              onClick={() => updateGoal.mutate({ id: goal.id, input: { monthlyContribution: s.monthly } })}
+              onClick={() =>
+                updateGoal.mutate({ id: goal.id, input: { monthlyContribution: s.monthly } })
+              }
               className={`flex w-full items-center justify-between rounded-xl border p-3 ${
-                s.monthly === monthly ? 'border-primary bg-primary/5' : 'border-[hsl(var(--hairline))]'
+                s.monthly === monthly
+                  ? 'border-primary bg-primary/5'
+                  : 'border-[hsl(var(--hairline))]'
               }`}
             >
               <div className="text-left">
@@ -213,7 +254,9 @@ export default function GoalDetailPage() {
               </div>
               <div className="text-right">
                 <div className="text-sm font-semibold">{s.eta} ay</div>
-                <div className="text-xs opacity-60">{i === 0 ? 'tahmini' : `${monthsToGoal - s.eta} ay erken`}</div>
+                <div className="text-xs opacity-60">
+                  {i === 0 ? 'tahmini' : `${monthsToGoal - s.eta} ay erken`}
+                </div>
               </div>
             </button>
           ))}
@@ -237,7 +280,11 @@ export default function GoalDetailPage() {
                     reached ? 'bg-primary text-white' : 'bg-[hsl(var(--divider-soft))]'
                   }`}
                 >
-                  {reached ? <Check size={14} /> : <span className="text-[10px] font-semibold">%{c.percent}</span>}
+                  {reached ? (
+                    <Check size={14} />
+                  ) : (
+                    <span className="text-[10px] font-semibold">%{c.percent}</span>
+                  )}
                 </div>
                 <div className="flex-1 text-sm">{c.label}</div>
                 <div className="text-xs opacity-60">{reached ? 'ulaşıldı' : 'bekliyor'}</div>
@@ -250,10 +297,14 @@ export default function GoalDetailPage() {
       <div className="ny-card mb-4 flex items-center justify-between">
         <div>
           <div className="text-sm font-semibold">Tasarruf planını otomatik güncelle</div>
-          <p className="mt-1 text-xs opacity-60">Fiyat değişince aylık katkın yeniden hesaplanır.</p>
+          <p className="mt-1 text-xs opacity-60">
+            Fiyat değişince aylık katkın yeniden hesaplanır.
+          </p>
         </div>
         <button
-          onClick={() => updateGoal.mutate({ id: goal.id, input: { autoUpdate: !goal.autoUpdate } })}
+          onClick={() =>
+            updateGoal.mutate({ id: goal.id, input: { autoUpdate: !goal.autoUpdate } })
+          }
           className={`relative h-7 w-12 rounded-full transition ${
             goal.autoUpdate ? 'bg-primary' : 'bg-[hsl(var(--divider-soft))]'
           }`}

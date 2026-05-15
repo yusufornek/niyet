@@ -77,6 +77,7 @@ export class RapidApiProductSearchProvider implements ProductSearchProvider {
       matchByUrl(products, goal.productUrl) ??
       matchByTitle(products, goal.selectedProductTitle) ??
       matchBySource(products, goal.productSource) ??
+      products[0] ??
       null
     );
   }
