@@ -1194,3 +1194,129 @@ export function useDeleteChatSession() {
     },
   });
 }
+
+// ───────────────────────────────────────────────────────────
+// Rules (auto-contribution) — eklenmek istenen: payday katkı kuralı
+// ───────────────────────────────────────────────────────────
+
+export type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'PAYDAY' | 'ONE_TIME';
+
+export interface Rule {
+  id: string;
+  label: string;
+  amount: number;
+  frequency: RuleFrequency;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RuleTriggerResult {
+  ruleId: string;
+  userId: string;
+  amount: number;
+  microContributionId: string;
+  notificationId: string;
+}
+
+export interface CreateRuleInput {
+  label: string;
+  amount: number;
+  frequency: RuleFrequency;
+  payday?: number | null;
+}
+
+export interface UpdateRuleInput {
+  label?: string;
+  amount?: number;
+  active?: boolean;
+}
+
+const RULES_Q = `query Rules {
+  rules { id label amount frequency active createdAt }
+}`;
+
+const CREATE_RULE_M = `mutation CreateRule($input: CreateRuleInput!) {
+  createRule(input: $input) { id label amount frequency active createdAt }
+}`;
+
+const UPDATE_RULE_M = `mutation UpdateRule($ruleId: ID!, $input: UpdateRuleInput!) {
+  updateRule(ruleId: $ruleId, input: $input) { id label amount frequency active createdAt }
+}`;
+
+const DELETE_RULE_M = `mutation DeleteRule($ruleId: ID!) {
+  deleteRule(ruleId: $ruleId)
+}`;
+
+const TRIGGER_RULE_M = `mutation TriggerRule($ruleId: ID!) {
+  triggerRule(ruleId: $ruleId) {
+    ruleId userId amount microContributionId notificationId
+  }
+}`;
+
+export function useRules() {
+  return useQuery({
+    queryKey: ['rules'],
+    queryFn: () => gqlFetcher<{ rules: Rule[] }, undefined>(RULES_Q),
+    select: (data) => data.rules,
+  });
+}
+
+export function useCreateRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateRuleInput) =>
+      gqlFetcher<{ createRule: Rule }, { input: CreateRuleInput }>(CREATE_RULE_M, { input }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rules'] });
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success('Katkı kuralı oluşturuldu');
+    },
+    onError: (e: Error) => toast.error('Kural oluşturulamadı', { description: e.message }),
+  });
+}
+
+export function useUpdateRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { ruleId: string; input: UpdateRuleInput }) =>
+      gqlFetcher<{ updateRule: Rule }, { ruleId: string; input: UpdateRuleInput }>(
+        UPDATE_RULE_M,
+        vars,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rules'] });
+    },
+    onError: (e: Error) => toast.error('Kural güncellenemedi', { description: e.message }),
+  });
+}
+
+export function useDeleteRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) =>
+      gqlFetcher<{ deleteRule: boolean }, { ruleId: string }>(DELETE_RULE_M, { ruleId }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rules'] });
+      toast.success('Kural silindi');
+    },
+    onError: (e: Error) => toast.error('Kural silinemedi', { description: e.message }),
+  });
+}
+
+export function useTriggerRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) =>
+      gqlFetcher<{ triggerRule: RuleTriggerResult }, { ruleId: string }>(TRIGGER_RULE_M, {
+        ruleId,
+      }),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('Otomatik katkı eklendi', {
+        description: `${data.triggerRule.amount.toLocaleString('tr-TR')} ₺ emeklilik katkına eklendi.`,
+      });
+    },
+    onError: (e: Error) => toast.error('Kural tetiklenemedi', { description: e.message }),
+  });
+}
