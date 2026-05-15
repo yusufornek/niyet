@@ -157,8 +157,11 @@ export default function GoalDetailPage() {
         <div className="mt-2 flex items-center justify-between">
           <div className="text-xs opacity-60">Fiyat geçmişi</div>
           <button
-            onClick={() => refreshPrice.mutate(goal.id)}
-            disabled={refreshPrice.isPending}
+            onClick={() => {
+              if (refreshPrice.isPending) return;
+              refreshPrice.mutate(goal.id);
+            }}
+            aria-disabled={refreshPrice.isPending}
             className="ny-chip"
           >
             <RefreshCw
