@@ -36,6 +36,8 @@ export type NotificationType =
   | 'SPENDING_ALERT'
   | 'GOAL_MILESTONE'
   | 'GOAL_PRICE_ALERT'
+  | 'LEARN_UPDATE'
+  | 'FINANCE_NEWS_IMPORTANT'
   | 'AI_INSIGHT'
   | 'ANALYSIS_COMPLETE'
   | 'RULE_TRIGGERED'
@@ -323,6 +325,59 @@ export interface Circle {
   }>;
 }
 
+export interface LearnQuizItem {
+  id: string;
+  question: string;
+  options: string[];
+  explanation: string;
+}
+
+export interface LearnCard {
+  id: string;
+  orderNo: number;
+  title: string;
+  shortDescription: string;
+  body: string;
+  sourceName: string;
+  sourceUrl: string;
+  sourceUpdatedAt: string | null;
+  completed: boolean;
+  quizItems: LearnQuizItem[];
+}
+
+export interface LearnUserState {
+  totalXp: number;
+  level: number;
+  streakDays: number;
+  lastActiveDate: string | null;
+}
+
+export interface LearnLeaderboardEntry {
+  userId: string;
+  userName: string;
+  totalXp: number;
+}
+
+export interface LearnHome {
+  packId: string;
+  packDate: string;
+  summary: string;
+  state: LearnUserState;
+  cards: LearnCard[];
+  leaderboard: LearnLeaderboardEntry[];
+}
+
+export interface FinanceNewsItem {
+  id: string;
+  title: string;
+  summaryShort: string;
+  sourceName: string;
+  sourceUrl: string;
+  publishedAt: string;
+  isImportant: boolean;
+  importanceScore: number;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Query string'leri
 // ─────────────────────────────────────────────────────────────
@@ -468,6 +523,44 @@ const CIRCLES_Q = `query Circles {
     members { id contribution user { id name } }
   }
 }`;
+const LEARN_HOME_Q = `query LearnHome($date: DateTime) {
+  learnHome(date: $date) {
+    packId packDate summary
+    state { totalXp level streakDays lastActiveDate }
+    leaderboard { userId userName totalXp }
+    cards {
+      id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+      quizItems { id question options explanation }
+    }
+  }
+}`;
+const LEARN_CARD_Q = `query LearnCard($id: ID!) {
+  learnCard(id: $id) {
+    id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+    quizItems { id question options explanation }
+  }
+}`;
+const LEARN_HISTORY_Q = `query LearnHistory($limit: Int) {
+  learnHistory(limit: $limit) {
+    packId packDate summary
+    state { totalXp level streakDays lastActiveDate }
+    leaderboard { userId userName totalXp }
+    cards {
+      id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+      quizItems { id question options explanation }
+    }
+  }
+}`;
+const FINANCE_NEWS_FEED_Q = `query FinanceNewsFeed($limit: Int, $importantOnly: Boolean) {
+  financeNewsFeed(limit: $limit, importantOnly: $importantOnly) {
+    id title summaryShort sourceName sourceUrl publishedAt isImportant importanceScore
+  }
+}`;
+const FINANCE_NEWS_ITEM_Q = `query FinanceNewsItem($id: ID!) {
+  financeNewsItem(id: $id) {
+    id title summaryShort sourceName sourceUrl publishedAt isImportant importanceScore
+  }
+}`;
 
 // ─────────────────────────────────────────────────────────────
 // Hooks — TanStack Query
@@ -607,6 +700,55 @@ export const useCircles = () =>
     staleTime: 60_000,
   });
 
+export const useLearnHome = (date?: string | null) =>
+  useQuery({
+    queryKey: ['learnHome', date ?? null],
+    queryFn: () =>
+      gqlFetcher<{ learnHome: LearnHome | null }, { date?: string | null }>(LEARN_HOME_Q, {
+        date: date ?? null,
+      }),
+    staleTime: 60_000,
+  });
+
+export const useLearnCard = (id: string) =>
+  useQuery({
+    queryKey: ['learnCard', id],
+    queryFn: () =>
+      gqlFetcher<{ learnCard: LearnCard | null }, { id: string }>(LEARN_CARD_Q, { id }),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+
+export const useLearnHistory = (limit = 10) =>
+  useQuery({
+    queryKey: ['learnHistory', limit],
+    queryFn: () =>
+      gqlFetcher<{ learnHistory: LearnHome[] }, { limit: number }>(LEARN_HISTORY_Q, { limit }),
+    staleTime: 60_000,
+  });
+
+export const useFinanceNewsFeed = (limit = 20, importantOnly = false) =>
+  useQuery({
+    queryKey: ['financeNewsFeed', limit, importantOnly],
+    queryFn: () =>
+      gqlFetcher<{ financeNewsFeed: FinanceNewsItem[] }, { limit: number; importantOnly: boolean }>(
+        FINANCE_NEWS_FEED_Q,
+        { limit, importantOnly },
+      ),
+    staleTime: 60_000,
+  });
+
+export const useFinanceNewsItem = (id: string) =>
+  useQuery({
+    queryKey: ['financeNewsItem', id],
+    queryFn: () =>
+      gqlFetcher<{ financeNewsItem: FinanceNewsItem | null }, { id: string }>(FINANCE_NEWS_ITEM_Q, {
+        id,
+      }),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+
 export const useMicroContributions = (
   options: {
     limit?: number;
@@ -692,6 +834,12 @@ const RUN_ANALYSIS_M = `mutation RunAnalysis($forceRefresh: Boolean) {
 
 const MARK_NOTIFICATION_READ_M = `mutation MarkNotificationRead($id: ID!) {
   markNotificationRead(id: $id) { id read }
+}`;
+const COMPLETE_LEARN_CARD_M = `mutation CompleteLearnCard($cardId: ID!, $quizAnswers: [Int!]!) {
+  completeLearnCard(cardId: $cardId, quizAnswers: $quizAnswers) {
+    xpEarned quizScore
+    state { totalXp level streakDays lastActiveDate }
+  }
 }`;
 
 export function useEditTransactionCategory() {
@@ -852,6 +1000,28 @@ export function useMarkNotificationRead() {
         { id },
       ),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useCompleteLearnCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, quizAnswers }: { cardId: string; quizAnswers: number[] }) =>
+      gqlFetcher<
+        {
+          completeLearnCard: {
+            xpEarned: number;
+            quizScore: number;
+            state: LearnUserState;
+          };
+        },
+        { cardId: string; quizAnswers: number[] }
+      >(COMPLETE_LEARN_CARD_M, { cardId, quizAnswers }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['learnHome'] });
+      void qc.invalidateQueries({ queryKey: ['learnHistory'] });
       void qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });

@@ -383,4 +383,25 @@ Hedef detayında "Beklenen yıllık enflasyon" alanı kullanıcı veya mock veri
 **Pozitif**: Hedef ekranındaki enflasyon varsayımı güncel resmi bültene bağlandı; her render'da TÜİK'e istek atılmadığı için sistem yorulmaz.
 **Negatif**: TÜİK frontend API veya bülten metni formatı değişirse parser güncellenmelidir.
 
+## ADR-012: Öğren modülü resmi kaynaklardan günlük yayınlanır
+
+**Tarih**: 2026-05-15
+**Durum**: Accepted
+**Karar verenler**: Yusuf, Codex
+**Revisit**: İlk 2 haftalık veri kalitesi sonrası
+
+### Karar
+
+- `/learn` içeriği statik kartlardan çıkarılıp günlük yayınlanan `LearnDailyPack` modeline taşındı.
+- Kaynaklar: EGM sayfaları + mevzuat listesi + TÜİK (resmi endpoint).
+- Yayın akışı: fetch -> normalize -> fact extraction -> validate -> publish.
+- Aynı içerik hash'inde yeni paket yayınlanmaz.
+- Yayın sonrası tüm kullanıcılar için `LEARN_UPDATE` bildirimi üretilir.
+- Rekabet scope'u yalnızca kullanıcının üye olduğu `Circle` üyeleri ile sınırlıdır; metrik `totalXp`.
+
+### Sonuçları
+
+**Pozitif**: Güncel, referanslı ve tekrar ziyaret ettiren öğrenme deneyimi; sistem yükü günlük cron ile sınırlı.
+**Negatif**: EGM/TÜİK HTML yapısı değişirse parser bakımı gerekir; bu yüzden validate katmanı zorunlu tutuldu.
+
 <!-- Yeni ADR'lar buraya eklenir -->

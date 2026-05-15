@@ -76,15 +76,17 @@ export default function NotificationsPage() {
             const targetHref =
               i.type === 'GOAL_PRICE_ALERT'
                 ? goalAlertHref(i.payload)
-                : i.type === 'ANALYSIS_COMPLETE' || i.type === 'AI_INSIGHT'
-                  ? '/history'
-                  : i.type === 'CONTRIBUTION_ACCEPTED'
-                    ? '/contributions'
-                    : i.type === 'GOAL_MILESTONE'
-                      ? '/goals'
-                      : i.type === 'RULE_TRIGGERED'
-                        ? '/rule'
-                        : null;
+                : i.type === 'FINANCE_NEWS_IMPORTANT'
+                  ? financeNewsHref(i.payload)
+                  : i.type === 'ANALYSIS_COMPLETE' || i.type === 'AI_INSIGHT'
+                    ? '/history'
+                    : i.type === 'CONTRIBUTION_ACCEPTED'
+                      ? '/contributions'
+                      : i.type === 'GOAL_MILESTONE'
+                        ? '/goals'
+                        : i.type === 'RULE_TRIGGERED'
+                          ? '/rule'
+                          : null;
             const handleClick = () => {
               if (!i.read) markRead.mutate(i.id);
               if (targetHref) router.push(targetHref);
@@ -156,4 +158,12 @@ function goalAlertHref(payload: unknown) {
 
   const goalId = (payload as { goalId?: unknown }).goalId;
   return typeof goalId === 'string' && goalId.length > 0 ? `/goals/${goalId}` : '/goals';
+}
+
+function financeNewsHref(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return '/news';
+  }
+  const newsId = (payload as { newsId?: unknown }).newsId;
+  return typeof newsId === 'string' && newsId.length > 0 ? `/news/${newsId}` : '/news';
 }

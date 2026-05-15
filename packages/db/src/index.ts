@@ -40,6 +40,7 @@ export {
   type CircleMembership,
   type FutureScoreSnapshot,
   type Notification,
+  type FinanceNewsItem,
   type AnalysisRun,
   type TransactionAnalysis,
   type MicroContribution,
