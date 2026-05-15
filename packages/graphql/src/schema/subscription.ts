@@ -7,6 +7,7 @@
  *   CANCELED → kullanıcı iptal etti, yıllık tutarı katkıya aktarıldı
  */
 import { builder } from '../builder';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { RuleFrequencyRef, SubscriptionStatusRef } from './enums';
 
 builder.prismaObject('Subscription', {
@@ -144,11 +145,13 @@ builder.mutationField('markSubscriptionStatus', (t) =>
       if (s.status === 'CANCELED') {
         throw new Error('İptal edilmiş abonelik tekrar açılamaz (yeni abonelik kaydet).');
       }
-      return ctx.prisma.subscription.update({
+      const updated = await ctx.prisma.subscription.update({
         ...query,
         where: { id: s.id },
         data: { status: args.status },
       });
+      await recomputeAndPersistFutureScore(ctx, userId, 'SUBSCRIPTION_CHANGED');
+      return updated;
     },
   }),
 );
@@ -210,6 +213,7 @@ builder.mutationField('cancelSubscription', (t) =>
           payload: { subscriptionId: s.id, contributionAmount },
         },
       });
+      await recomputeAndPersistFutureScore(ctx, userId, 'SUBSCRIPTION_CHANGED');
 
       return ctx.prisma.subscription.findUniqueOrThrow({
         ...query,

@@ -22,7 +22,7 @@ import { RulesWidget } from '@/components/rules-widget';
 import { ScoreCard } from '@/components/score-card';
 import {
   useDashboard,
-  useFutureScore,
+  useFutureScoreInsights,
   useGoals,
   useMe,
   useSubscriptionSummary,
@@ -37,13 +37,14 @@ export default function DashboardPage() {
   const { data: me } = useMe();
   const { data: dash, isLoading: dashLoading } = useDashboard();
   const { data: goalsData } = useGoals();
-  const { data: scoreData } = useFutureScore();
+  const { data: scoreData } = useFutureScoreInsights();
   const { data: subData } = useSubscriptionSummary();
 
   const userName = me?.me?.name?.split(' ')[0] ?? '';
   const goal = goalsData?.goals[0];
   const dashboard = dash?.dashboard;
-  const score = scoreData?.futureScore;
+  const score = scoreData?.futureScoreInsights?.current;
+  const scoreInsight = scoreData?.futureScoreInsights;
   const acceptedShown = dashboard?.acceptedContributionsLast30d ?? 0;
   const totalAccepted = dashboard?.totalAcceptedContributions ?? 0;
 
@@ -76,10 +77,10 @@ export default function DashboardPage() {
 
       <ScoreCard
         score={score?.score ?? 0}
-        delta={4}
-        title="İyi gidiyorsun"
+        delta={scoreInsight?.delta ?? 0}
+        title={scoreInsight?.label ?? 'İyi gidiyorsun'}
         subtitle="Üzerine gel — genel istatistiklerini gör."
-        status="Sağlıklı finansal ritim"
+        status={scoreInsight?.status ?? 'Sağlıklı finansal ritim'}
         onOpen={() => router.push('/score')}
         stats={[
           {

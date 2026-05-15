@@ -273,6 +273,28 @@ export interface FutureScore {
   computedAt: string;
 }
 
+export interface FutureScoreDriver {
+  metric: string;
+  delta: number;
+  direction: 'UP' | 'DOWN' | 'FLAT';
+}
+
+export interface UserBadge {
+  key: string;
+  title: string;
+  unlockedAt: string;
+}
+
+export interface FutureScoreInsights {
+  current: FutureScore | null;
+  previous: FutureScore | null;
+  delta: number;
+  label: string;
+  status: string;
+  topDriver: FutureScoreDriver;
+  badges: UserBadge[];
+}
+
 export interface NotificationItem {
   id: string;
   type: NotificationType;
@@ -498,6 +520,17 @@ const LATEST_INFLATION_RATE_Q = `query LatestInflationRate {
 const FUTURE_SCORE_Q = `query FutureScore {
   futureScore { id score contribution discipline consistency social computedAt }
 }`;
+const FUTURE_SCORE_INSIGHTS_Q = `query FutureScoreInsights {
+  futureScoreInsights {
+    current { id score contribution discipline consistency social computedAt }
+    previous { id score contribution discipline consistency social computedAt }
+    delta
+    label
+    status
+    topDriver { metric delta direction }
+    badges { key title unlockedAt }
+  }
+}`;
 const NOTIFICATIONS_Q = `query Notifications($unreadOnly: Boolean) {
   notifications(unreadOnly: $unreadOnly) {
     id type title body read payload createdAt
@@ -659,6 +692,14 @@ export const useFutureScore = () =>
   useQuery({
     queryKey: ['futureScore'],
     queryFn: () => gqlFetcher<{ futureScore: FutureScore | null }, undefined>(FUTURE_SCORE_Q),
+    staleTime: 60_000,
+  });
+
+export const useFutureScoreInsights = () =>
+  useQuery({
+    queryKey: ['futureScoreInsights'],
+    queryFn: () =>
+      gqlFetcher<{ futureScoreInsights: FutureScoreInsights }, undefined>(FUTURE_SCORE_INSIGHTS_Q),
     staleTime: 60_000,
   });
 

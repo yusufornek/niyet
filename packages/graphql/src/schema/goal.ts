@@ -21,6 +21,7 @@ import {
   SearchGoalProductsInputSchema,
 } from '../goal-tracking/validation';
 import { fetchLatestTuikInflationRate } from '../inflation/tuik';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { GoalStatusRef, PriceAlertDirectionRef } from './enums';
 
 const GoalRef = builder.prismaObject('Goal', {
@@ -319,6 +320,7 @@ builder.mutationField('createGoal', (t) =>
           },
         });
       }
+      await recomputeAndPersistFutureScore(ctx, ctx.userId!, 'GOAL_CHANGED');
 
       return goal;
     },
@@ -398,11 +400,13 @@ builder.mutationField('updateGoal', (t) =>
       if (input.coachContext !== undefined && input.coachContext !== null)
         data.coachContext = input.coachContext;
 
-      return ctx.prisma.goal.update({
+      const updatedGoal = await ctx.prisma.goal.update({
         ...query,
         where: { id: String(args.id) },
         data,
       });
+      await recomputeAndPersistFutureScore(ctx, ctx.userId!, 'GOAL_CHANGED');
+      return updatedGoal;
     },
   }),
 );
