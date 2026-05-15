@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { RulesWidget } from '@/components/rules-widget';
 import { ScoreCard } from '@/components/score-card';
 import {
   useDashboard,
@@ -207,6 +208,10 @@ export default function DashboardPage() {
           </div>
         </Link>
       )}
+
+      <div className="mb-3">
+        <RulesWidget />
+      </div>
 
       <div className="ny-eyebrow mb-2 mt-5">Hızlı erişim</div>
       <div className="mb-3 grid grid-cols-3 gap-3">

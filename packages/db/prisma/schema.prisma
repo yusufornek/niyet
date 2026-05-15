@@ -124,6 +124,8 @@ model User {
   monthlyIncome     Decimal   @db.Money
   consentAcceptedAt DateTime?
   consentVersion    String?
+  /// Maaş günü (ayın 1-31. günü). Null ise PAYDAY kuralları tetiklenmez.
+  payday            Int?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
