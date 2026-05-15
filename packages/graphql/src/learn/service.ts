@@ -92,89 +92,80 @@ export class LearnService {
       return { created: false, packId: null, reason: `validation_failed:${validation.reason}` };
     }
 
-    const published = await this.prisma.$transaction(async (tx) => {
-      const pack = await tx.learnDailyPack.upsert({
-        where: { packDate },
-        update: {
-          status: 'PUBLISHED',
-          sourceHash,
-          summary: draft.summary,
-          publishedAt: now,
-        },
-        create: {
-          packDate,
-          status: 'PUBLISHED',
-          sourceHash,
-          summary: draft.summary,
-          publishedAt: now,
+    const published = await this.prisma.learnDailyPack.upsert({
+      where: { packDate },
+      update: {
+        status: 'PUBLISHED',
+        sourceHash,
+        summary: draft.summary,
+        publishedAt: now,
+      },
+      create: {
+        packDate,
+        status: 'PUBLISHED',
+        sourceHash,
+        summary: draft.summary,
+        publishedAt: now,
+      },
+    });
+
+    await this.prisma.learnSourceSnapshot.deleteMany({ where: { packId: published.id } });
+    await this.prisma.learnFact.deleteMany({ where: { packId: published.id } });
+    await this.prisma.learnQuizItem.deleteMany({ where: { card: { packId: published.id } } });
+    await this.prisma.learnCard.deleteMany({ where: { packId: published.id } });
+
+    await this.prisma.learnSourceSnapshot.createMany({
+      data: draft.snapshots.map((snapshot) => ({
+        packId: published.id,
+        sourceType: snapshot.sourceType,
+        sourceUrl: snapshot.sourceUrl,
+        sourceTitle: snapshot.sourceTitle,
+        effectiveDate: snapshot.effectiveDate ?? null,
+        contentHash: stableHash(snapshot.rawContent),
+        rawContent: snapshot.rawContent,
+      })),
+    });
+
+    await this.prisma.learnFact.createMany({
+      data: draft.facts.map((fact) => ({
+        packId: published.id,
+        key: fact.key,
+        label: fact.label,
+        valueText: fact.valueText,
+        valueNumber: fact.valueNumber ?? null,
+        unit: fact.unit ?? null,
+        confidence: fact.confidence,
+        sourceUrl: fact.sourceUrl,
+        effectiveDate: fact.effectiveDate ?? null,
+      })),
+    });
+
+    for (const card of draft.cards) {
+      await this.prisma.learnCard.create({
+        data: {
+          packId: published.id,
+          orderNo: card.orderNo,
+          slug: card.slug,
+          title: card.title,
+          shortDescription: card.shortDescription,
+          body: card.body,
+          sourceName: card.sourceName,
+          sourceUrl: card.sourceUrl,
+          sourceUpdatedAt: card.sourceUpdatedAt ?? null,
+          quizItems: {
+            createMany: {
+              data: card.quiz.map((quizItem) => ({
+                question: quizItem.question,
+                optionsJson: quizItem.options,
+                correctIndex: quizItem.correctIndex,
+                explanation: quizItem.explanation,
+                explanationLlm: quizItem.explanationLlm ?? null,
+              })),
+            },
+          },
         },
       });
-
-      await tx.learnSourceSnapshot.deleteMany({ where: { packId: pack.id } });
-      await tx.learnFact.deleteMany({ where: { packId: pack.id } });
-      await tx.learnQuizItem.deleteMany({ where: { card: { packId: pack.id } } });
-      await tx.learnCard.deleteMany({ where: { packId: pack.id } });
-
-      for (const snapshot of draft.snapshots) {
-        await tx.learnSourceSnapshot.create({
-          data: {
-            packId: pack.id,
-            sourceType: snapshot.sourceType,
-            sourceUrl: snapshot.sourceUrl,
-            sourceTitle: snapshot.sourceTitle,
-            effectiveDate: snapshot.effectiveDate ?? null,
-            contentHash: stableHash(snapshot.rawContent),
-            rawContent: snapshot.rawContent,
-          },
-        });
-      }
-
-      for (const fact of draft.facts) {
-        await tx.learnFact.create({
-          data: {
-            packId: pack.id,
-            key: fact.key,
-            label: fact.label,
-            valueText: fact.valueText,
-            valueNumber: fact.valueNumber ?? null,
-            unit: fact.unit ?? null,
-            confidence: fact.confidence,
-            sourceUrl: fact.sourceUrl,
-            effectiveDate: fact.effectiveDate ?? null,
-          },
-        });
-      }
-
-      for (const card of draft.cards) {
-        const createdCard = await tx.learnCard.create({
-          data: {
-            packId: pack.id,
-            orderNo: card.orderNo,
-            slug: card.slug,
-            title: card.title,
-            shortDescription: card.shortDescription,
-            body: card.body,
-            sourceName: card.sourceName,
-            sourceUrl: card.sourceUrl,
-            sourceUpdatedAt: card.sourceUpdatedAt ?? null,
-          },
-        });
-        for (const quizItem of card.quiz) {
-          await tx.learnQuizItem.create({
-            data: {
-              cardId: createdCard.id,
-              question: quizItem.question,
-              optionsJson: quizItem.options,
-              correctIndex: quizItem.correctIndex,
-              explanation: quizItem.explanation,
-              explanationLlm: quizItem.explanationLlm ?? null,
-            },
-          });
-        }
-      }
-
-      return pack;
-    });
+    }
 
     await this.emitLearnUpdateNotifications(published.id);
     return { created: true, packId: published.id, reason: 'published' };
