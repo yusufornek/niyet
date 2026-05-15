@@ -35,6 +35,7 @@ export type SubscriptionStatus = 'ACTIVE' | 'CANCELLABLE' | 'CANCELED';
 export type NotificationType =
   | 'SPENDING_ALERT'
   | 'GOAL_MILESTONE'
+  | 'GOAL_PRICE_ALERT'
   | 'AI_INSIGHT'
   | 'ANALYSIS_COMPLETE'
   | 'RULE_TRIGGERED'
@@ -208,6 +209,9 @@ export interface Goal {
   productSource?: string | null;
   currency?: string;
   lastCheckedAt?: string | null;
+  nextPriceCheckAt?: string | null;
+  planSummary?: string | null;
+  planGeneratedAt?: string | null;
   trackedProgress?: number;
   trackedRemainingAmount?: number;
 }
@@ -264,6 +268,7 @@ export interface NotificationItem {
   title: string;
   body: string;
   read: boolean;
+  payload: unknown | null;
   createdAt: string;
 }
 
@@ -402,15 +407,15 @@ const CANCEL_SUB_M = `mutation CancelSubscription($id: ID!, $contributionAmount:
 const GOALS_Q = `query Goals {
   goals {
     id name basePrice currentPrice inflationPct targetDate current
-    monthlyContribution status autoUpdate
+    monthlyContribution status autoUpdate planSummary planGeneratedAt
   }
 }`;
 const GOAL_Q = `query Goal($id: ID!) {
   goal(id: $id) {
     id name basePrice currentPrice inflationPct targetDate current
-    monthlyContribution status autoUpdate priceHistory
+    monthlyContribution status autoUpdate priceHistory planSummary planGeneratedAt
     rawQuery normalizedQuery category selectedProductTitle productUrl
-    productImage productSource currency lastCheckedAt
+    productImage productSource currency lastCheckedAt nextPriceCheckAt
     trackedProgress trackedRemainingAmount
     checkpoints { id percent label reached reachedAt }
   }
@@ -426,7 +431,7 @@ const FUTURE_SCORE_Q = `query FutureScore {
 }`;
 const NOTIFICATIONS_Q = `query Notifications($unreadOnly: Boolean) {
   notifications(unreadOnly: $unreadOnly) {
-    id type title body read createdAt
+    id type title body read payload createdAt
   }
 }`;
 const ANALYSIS_HISTORY_Q = `query AnalysisHistory($limit: Int) {
@@ -526,9 +531,12 @@ export const useGoalPriceAlerts = (unreadOnly = false) =>
   useQuery({
     queryKey: ['goalPriceAlerts', unreadOnly],
     queryFn: () =>
-      gqlFetcher<{ goalPriceAlerts: GoalPriceAlert[] }, { unreadOnly: boolean }>(GOAL_PRICE_ALERTS_Q, {
-        unreadOnly,
-      }),
+      gqlFetcher<{ goalPriceAlerts: GoalPriceAlert[] }, { unreadOnly: boolean }>(
+        GOAL_PRICE_ALERTS_Q,
+        {
+          unreadOnly,
+        },
+      ),
     staleTime: 30_000,
   });
 
@@ -618,7 +626,7 @@ const EDIT_TRANSACTION_CATEGORY_M = `mutation EditTxCategory($id: ID!, $category
 
 const CREATE_GOAL_M = `mutation CreateGoal($input: GoalInput!) {
   createGoal(input: $input) {
-    id name basePrice currentPrice targetDate current monthlyContribution status
+    id name basePrice currentPrice targetDate current monthlyContribution status planSummary planGeneratedAt
   }
 }`;
 
@@ -750,9 +758,12 @@ export function useNormalizeGoalProductQuery() {
 export function useSearchGoalProducts() {
   return useMutation({
     mutationFn: (query: string) =>
-      gqlFetcher<{ searchGoalProducts: ProductSearchResult[] }, { query: string }>(SEARCH_GOAL_PRODUCTS_M, {
-        query,
-      }),
+      gqlFetcher<{ searchGoalProducts: ProductSearchResult[] }, { query: string }>(
+        SEARCH_GOAL_PRODUCTS_M,
+        {
+          query,
+        },
+      ),
   });
 }
 
@@ -783,10 +794,10 @@ export function useMarkGoalPriceAlertRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (alertId: string) =>
-      gqlFetcher<{ markGoalPriceAlertRead: { id: string; readAt: string | null } }, { alertId: string }>(
-        MARK_GOAL_ALERT_READ_M,
-        { alertId },
-      ),
+      gqlFetcher<
+        { markGoalPriceAlertRead: { id: string; readAt: string | null } },
+        { alertId: string }
+      >(MARK_GOAL_ALERT_READ_M, { alertId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['goalPriceAlerts'] });
     },

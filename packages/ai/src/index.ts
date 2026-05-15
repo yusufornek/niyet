@@ -43,5 +43,11 @@ export {
   type ProductQueryRewriteAdapter,
   type QueryRewriteAdapterOptions,
 } from './query-normalizer';
+export {
+  GeminiGoalPlanNarrator,
+  type GeminiGoalPlanNarratorOptions,
+  type GoalPlanNarrationInput,
+  type GoalPlanNarrator,
+} from './goal-plan-narrator';
 
 export const AI_PACKAGE_VERSION = '0.2.0';
