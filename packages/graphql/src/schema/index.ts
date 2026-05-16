@@ -19,6 +19,7 @@ import './finance-news';
 import './rule';
 import './category-auto-save';
 import './fund';
+import './category-spending-alert';
 
 import { builder } from '../builder';
 

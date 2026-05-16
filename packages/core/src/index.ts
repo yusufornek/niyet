@@ -20,3 +20,4 @@ export * from './goal-progress';
 export * from './pause';
 export * from './category-auto-save';
 export * from './fund-recommendation';
+export * from './category-spending-alert';
