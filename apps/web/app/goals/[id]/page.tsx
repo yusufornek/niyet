@@ -1,10 +1,11 @@
 'use client';
 
-import { AlertTriangle, Check, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, Check, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 
 import { PhoneShell } from '@/components/phone-shell';
 import {
+  type GoalPlanLevel,
   useGoal,
   useGoalPriceAlerts,
   useLatestInflationRate,
@@ -13,6 +14,30 @@ import {
   useUpdateGoal,
 } from '@/lib/graphql/queries';
 import { formatTRY } from '@/lib/utils';
+
+const LEVEL_STYLES: Record<
+  GoalPlanLevel,
+  { label: string; container: string; badge: string; icon: string }
+> = {
+  ON_TRACK: {
+    label: 'Plan gerçekçi',
+    container: 'border-emerald-300/60 bg-emerald-50/40',
+    badge: 'bg-emerald-100 text-emerald-800',
+    icon: '✓',
+  },
+  STRETCH: {
+    label: 'Plan sıkı',
+    container: 'border-amber-300/60 bg-amber-50/40',
+    badge: 'bg-amber-100 text-amber-800',
+    icon: '⚡',
+  },
+  AT_RISK: {
+    label: 'Plan riskli',
+    container: 'border-rose-300/60 bg-rose-50/40',
+    badge: 'bg-rose-100 text-rose-800',
+    icon: '⚠',
+  },
+};
 
 export default function GoalDetailPage() {
   const router = useRouter();
@@ -121,6 +146,50 @@ export default function GoalDetailPage() {
           <span>Tahmini: {etaLabel}</span>
         </div>
       </div>
+
+      {goal.savingsPlan && (
+        <div className={`ny-card mb-4 border-2 ${LEVEL_STYLES[goal.savingsPlan.level].container}`}>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="ny-eyebrow flex items-center gap-1">
+              <Clock size={12} /> Plan gerçekçiliği
+            </div>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${LEVEL_STYLES[goal.savingsPlan.level].badge}`}
+            >
+              {LEVEL_STYLES[goal.savingsPlan.level].icon}{' '}
+              {LEVEL_STYLES[goal.savingsPlan.level].label.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="text-sm leading-relaxed">
+            {goal.savingsPlan.projectedMonthsToGoal == null ? (
+              <span>
+                Mevcut hızla bu hedefe ulaşılamıyor (aylık katkı yok). Bir kural ekleyerek
+                başlayabilirsin.
+              </span>
+            ) : (
+              <ProjectionMessage
+                projected={goal.savingsPlan.projectedMonthsToGoal}
+                target={goal.savingsPlan.targetMonthsRemaining}
+                etaLabel={etaLabel}
+              />
+            )}
+          </div>
+
+          {goal.savingsPlan.monthlyGap > 0 && (
+            <div className="mt-2 rounded-lg bg-white/60 px-2 py-1.5 text-xs">
+              Hedef tarihine yetişmek için ayda <b>{formatTRY(goal.savingsPlan.monthlyGap)}</b> daha
+              gerek. Şu an aylık <b>{formatTRY(goal.savingsPlan.suggestedMonthlyContribution)}</b>{' '}
+              öneri,
+              <b> {formatTRY(goal.savingsPlan.requiredMonthlyContribution)}</b> şart.
+            </div>
+          )}
+
+          {goal.savingsPlan.summary && (
+            <div className="mt-2 text-xs italic opacity-70">{goal.savingsPlan.summary}</div>
+          )}
+        </div>
+      )}
 
       {goal.planSummary && (
         <div className="ny-card mb-4">
@@ -328,5 +397,42 @@ export default function GoalDetailPage() {
         <Sparkles size={16} /> AI Tasarruf Koçu ile konuş
       </button>
     </PhoneShell>
+  );
+}
+
+/**
+ * Plan gerçekçilik banner'ında "mevcut hızla X ay, hedef tarihine Y ay var,
+ * Z ay erken/geç ulaşacaksın" mesajını render eder. Pure presentation.
+ */
+function ProjectionMessage({
+  projected,
+  target,
+  etaLabel,
+}: {
+  projected: number;
+  target: number;
+  etaLabel: string;
+}) {
+  const delta = projected - target;
+  return (
+    <span>
+      Mevcut hızla <b>{projected} ay</b> sürer ({etaLabel}). Hedef tarihine <b>{target} ay</b> var
+      {delta > 0 ? (
+        <>
+          {' '}
+          — <b className="text-rose-700">{delta} ay geç</b> ulaşacaksın.
+        </>
+      ) : delta < 0 ? (
+        <>
+          {' '}
+          — <b className="text-emerald-700">{Math.abs(delta)} ay erken</b> ulaşacaksın.
+        </>
+      ) : (
+        <>
+          {' '}
+          — <b className="text-emerald-700">tam zamanında</b> ulaşacaksın.
+        </>
+      )}
+    </span>
   );
 }

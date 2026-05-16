@@ -24,6 +24,36 @@ import { fetchLatestTuikInflationRate } from '../inflation/tuik';
 import { recomputeAndPersistFutureScore } from '../score/service';
 import { GoalStatusRef, PriceAlertDirectionRef } from './enums';
 
+const GoalPlanLevelRef = builder.enumType('GoalPlanLevel', {
+  description:
+    'Hedef planının gerçekçilik seviyesi. ON_TRACK: önerilen katkı yeterli. ' +
+    'STRETCH: ulaşılabilir ama gap var. AT_RISK: mevcut hızla hedef tarihine yetişemiyor.',
+  values: ['ON_TRACK', 'STRETCH', 'AT_RISK'] as const,
+});
+
+const GoalSavingsPlanType = builder.simpleObject('GoalSavingsPlan', {
+  description:
+    'Hedef için tasarruf planı: kullanıcının davranışsal kapasitesi ile hedef tarihi ' +
+    "arasında gerçekçilik değerlendirmesi. Pure logic (packages/core); her query'de " +
+    "fresh hesaplanır, DB'ye persist edilmez.",
+  fields: (t) => ({
+    /// Hedef tarihine yetişmek için ayda yatırılması gereken tutar (TL)
+    requiredMonthlyContribution: t.float(),
+    /// Kullanıcının davranışsal kapasitesinden önerilen tutar (TL)
+    suggestedMonthlyContribution: t.float(),
+    /// required - suggested farkı (pozitifse açık var demek)
+    monthlyGap: t.float(),
+    /// Mevcut hızla hedefe ne kadar ay kaldığı. Katkı 0/Infinity ise null.
+    projectedMonthsToGoal: t.float({ nullable: true }),
+    /// Hedef tarihine kalan ay sayısı
+    targetMonthsRemaining: t.int(),
+    /// Gerçekçilik seviyesi (UI'da renkli badge)
+    level: t.field({ type: GoalPlanLevelRef }),
+    /// Insan-okur özet (fallback metni; AI summary planSummary alanında ayrı)
+    summary: t.string(),
+  }),
+});
+
 const GoalRef = builder.prismaObject('Goal', {
   fields: (t) => ({
     id: t.exposeID('id'),
@@ -78,6 +108,63 @@ const GoalRef = builder.prismaObject('Goal', {
     trackedRemainingAmount: t.float({
       resolve: (goal) =>
         calculateRemainingAmount(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
+    }),
+
+    /// Mevcut tasarruf hızıyla hedefe ETA + gerçekçilik (ON_TRACK/STRETCH/AT_RISK).
+    /// Resolver son 30 günün opportunity + accepted contributions verisini çekip
+    /// pure `buildGoalSavingsPlan` çağırır. DB'ye yazılmaz, her query'de fresh.
+    savingsPlan: t.field({
+      type: GoalSavingsPlanType,
+      resolve: async (goal, _args, ctx) => {
+        const since30 = new Date();
+        since30.setDate(since30.getDate() - 30);
+        const [user, txs, contribs] = await Promise.all([
+          ctx.prisma.user.findUniqueOrThrow({
+            where: { id: goal.userId },
+            select: { monthlyIncome: true },
+          }),
+          ctx.prisma.transaction.findMany({
+            where: { userId: goal.userId, occurredAt: { gte: since30 } },
+            select: { opportunity: true },
+          }),
+          ctx.prisma.microContribution.findMany({
+            where: {
+              userId: goal.userId,
+              status: { not: 'REVERSED' },
+              createdAt: { gte: since30 },
+            },
+            select: { amount: true },
+          }),
+        ]);
+        const last30dOpportunity = txs.reduce(
+          (s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0),
+          0,
+        );
+        const acceptedContributionsLast30d = contribs.reduce((s, c) => s + Number(c.amount), 0);
+
+        const plan = buildGoalSavingsPlan({
+          targetPrice: Number(goal.currentPrice),
+          currentAmount: Number(goal.current),
+          targetDate: goal.targetDate,
+          monthlyIncome: Number(user.monthlyIncome),
+          last30dOpportunity,
+          acceptedContributionsLast30d,
+          now: ctx.now(),
+        });
+
+        return {
+          requiredMonthlyContribution: plan.requiredMonthlyContribution,
+          suggestedMonthlyContribution: plan.suggestedMonthlyContribution,
+          monthlyGap: plan.monthlyGap,
+          // Infinity → null (GraphQL Float Infinity destek vermez, frontend null'ı handle eder)
+          projectedMonthsToGoal: Number.isFinite(plan.projectedMonthsToGoal)
+            ? plan.projectedMonthsToGoal
+            : null,
+          targetMonthsRemaining: plan.targetMonthsRemaining,
+          level: plan.level,
+          summary: plan.summary,
+        };
+      },
     }),
 
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
