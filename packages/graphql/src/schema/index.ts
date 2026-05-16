@@ -20,6 +20,7 @@ import './rule';
 import './category-auto-save';
 import './fund';
 import './category-spending-alert';
+import './monthly-contribution-target';
 
 import { builder } from '../builder';
 

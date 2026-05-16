@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { MonthlyTargetWidget } from '@/components/monthly-target-widget';
 import { RulesWidget } from '@/components/rules-widget';
 import { SavingsProjectionWidget } from '@/components/savings-projection-widget';
 import { ScoreCard } from '@/components/score-card';
@@ -115,6 +116,8 @@ export default function DashboardPage() {
       <div className="mb-3">
         <SavingsProjectionWidget />
       </div>
+
+      <MonthlyTargetWidget />
 
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Link href="/radar" className="ny-card text-left">
