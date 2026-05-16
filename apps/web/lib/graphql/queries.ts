@@ -190,6 +190,19 @@ export interface GoalCheckpoint {
   reachedAt: string | null;
 }
 
+export type GoalPlanLevel = 'ON_TRACK' | 'STRETCH' | 'AT_RISK';
+
+export interface GoalSavingsPlan {
+  requiredMonthlyContribution: number;
+  suggestedMonthlyContribution: number;
+  monthlyGap: number;
+  /** null = ulaşılmıyor (katkı 0 veya Infinity) */
+  projectedMonthsToGoal: number | null;
+  targetMonthsRemaining: number;
+  level: GoalPlanLevel;
+  summary: string;
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -217,6 +230,7 @@ export interface Goal {
   planGeneratedAt?: string | null;
   trackedProgress?: number;
   trackedRemainingAmount?: number;
+  savingsPlan?: GoalSavingsPlan;
 }
 
 export interface ProductQueryNormalization {
@@ -506,6 +520,10 @@ const GOAL_Q = `query Goal($id: ID!) {
     productImage productSource currency lastCheckedAt nextPriceCheckAt
     trackedProgress trackedRemainingAmount
     checkpoints { id percent label reached reachedAt }
+    savingsPlan {
+      requiredMonthlyContribution suggestedMonthlyContribution monthlyGap
+      projectedMonthsToGoal targetMonthsRemaining level summary
+    }
   }
 }`;
 const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {
