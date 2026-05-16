@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   annualProjection,
   categoryBreakdown,
+  projectSavingsHorizon,
   totalMonthlyOpportunity,
   type Transaction,
 } from '../savings-engine';
@@ -62,5 +63,56 @@ describe('annualProjection', () => {
     const result = annualProjection(1000, 24); // %24 enflasyon
     expect(result).toBeGreaterThan(12000);
     expect(result).toBeLessThan(15000); // makul sınır
+  });
+});
+
+describe('projectSavingsHorizon', () => {
+  it('bugün 0 ise tüm projeksiyonlar 0', () => {
+    const r = projectSavingsHorizon({ todayAmount: 0 });
+    expect(r.todayAmount).toBe(0);
+    expect(r.monthlyAmount).toBe(0);
+    expect(r.yearlyAmount).toBe(0);
+    expect(r.horizon.every((h) => h.totalAmount === 0)).toBe(true);
+  });
+
+  it('bugün 25 ₺ → ay 750 ₺ → yıl 9000 ₺', () => {
+    const r = projectSavingsHorizon({ todayAmount: 25 });
+    expect(r.todayAmount).toBe(25);
+    expect(r.monthlyAmount).toBe(750);
+    expect(r.yearlyAmount).toBe(9000);
+  });
+
+  it('default horizon: 5, 10, 30 yıl noktaları', () => {
+    const r = projectSavingsHorizon({ todayAmount: 25 });
+    expect(r.horizon.map((h) => h.years)).toEqual([5, 10, 30]);
+  });
+
+  it('%5 yıllık getiriyle 30 yıl compound: yatırılandan büyük', () => {
+    const r = projectSavingsHorizon({ todayAmount: 25, annualReturnPct: 5 });
+    const thirty = r.horizon.find((h) => h.years === 30)!;
+    // 30 yıl × 12 ay × 750 ₺ = 270.000 ₺ yatırıldı
+    expect(thirty.totalContributed).toBe(270_000);
+    // %5 compound ile yaklaşık 624.000 ₺ olur (kabul edilen yuvarlama)
+    expect(thirty.totalAmount).toBeGreaterThan(600_000);
+    expect(thirty.totalAmount).toBeLessThan(650_000);
+    expect(thirty.growth).toBe(thirty.totalAmount - thirty.totalContributed);
+  });
+
+  it('return %0 ise compound yok, totalAmount = totalContributed', () => {
+    const r = projectSavingsHorizon({ todayAmount: 25, annualReturnPct: 0 });
+    for (const h of r.horizon) {
+      expect(h.totalAmount).toBe(h.totalContributed);
+      expect(h.growth).toBe(0);
+    }
+  });
+
+  it('özel horizonYears ile çağrılabilir', () => {
+    const r = projectSavingsHorizon({ todayAmount: 10, horizonYears: [1, 20] });
+    expect(r.horizon.map((h) => h.years)).toEqual([1, 20]);
+  });
+
+  it('negatif girdi 0 olarak kabul edilir', () => {
+    const r = projectSavingsHorizon({ todayAmount: -50 });
+    expect(r.todayAmount).toBe(0);
   });
 });
