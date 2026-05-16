@@ -1361,3 +1361,251 @@ export function useTriggerRule() {
     onError: (e: Error) => toast.error('Kural tetiklenemedi', { description: e.message }),
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// Category Auto-Save — PBI: ortalama-altı kategori farkını otomatik aktar
+// ─────────────────────────────────────────────────────────────
+
+export interface CategoryAutoSaveRule {
+  id: string;
+  category: SpendingCategory;
+  lookbackMonths: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastTriggeredAt: string | null;
+  lastTriggeredMonth: string | null;
+  lastTransferAmount: number | null;
+}
+
+export interface CategoryAutoSaveLookbackMonth {
+  monthYear: string;
+  amount: number;
+  txCount: number;
+}
+
+export interface CategoryAutoSaveShortfall {
+  monthYear: string;
+  currentAmount: number;
+  averageAmount: number | null;
+  lookback: CategoryAutoSaveLookbackMonth[];
+  lookbackMonthsAnalyzed: number;
+  hasSufficientHistory: boolean;
+  shortfallAmount: number;
+  shortfallPct: number | null;
+  shouldTrigger: boolean;
+}
+
+export type CategoryAutoSaveOutcomeStatus =
+  | 'TRIGGERED'
+  | 'SKIPPED_ALREADY_TRIGGERED'
+  | 'SKIPPED_INSUFFICIENT_HISTORY'
+  | 'SKIPPED_NO_SHORTFALL';
+
+export interface CategoryAutoSaveOutcome {
+  ruleId: string;
+  monthYear: string;
+  category: SpendingCategory;
+  status: CategoryAutoSaveOutcomeStatus;
+  shortfall: CategoryAutoSaveShortfall;
+  microContributionId: string | null;
+}
+
+const CATEGORY_AUTO_SAVE_RULES_Q = `query CategoryAutoSaveRules {
+  categoryAutoSaveRules {
+    id category lookbackMonths active createdAt updatedAt
+    lastTriggeredAt lastTriggeredMonth lastTransferAmount
+  }
+}`;
+
+const PREVIEW_CATEGORY_AUTO_SAVE_Q = `query PreviewCategoryAutoSave($category: SpendingCategory!, $lookbackMonths: Int, $monthYear: String) {
+  previewCategoryAutoSave(category: $category, lookbackMonths: $lookbackMonths, monthYear: $monthYear) {
+    monthYear currentAmount averageAmount
+    lookback { monthYear amount txCount }
+    lookbackMonthsAnalyzed hasSufficientHistory
+    shortfallAmount shortfallPct shouldTrigger
+  }
+}`;
+
+const CREATE_CATEGORY_AUTO_SAVE_M = `mutation CreateCategoryAutoSaveRule($category: SpendingCategory!, $lookbackMonths: Int) {
+  createCategoryAutoSaveRule(category: $category, lookbackMonths: $lookbackMonths) {
+    id category lookbackMonths active createdAt
+  }
+}`;
+
+const DELETE_CATEGORY_AUTO_SAVE_M = `mutation DeleteCategoryAutoSaveRule($id: ID!) {
+  deleteCategoryAutoSaveRule(id: $id)
+}`;
+
+const SET_CATEGORY_AUTO_SAVE_ACTIVE_M = `mutation SetCategoryAutoSaveRuleActive($id: ID!, $active: Boolean!) {
+  setCategoryAutoSaveRuleActive(id: $id, active: $active) {
+    id active
+  }
+}`;
+
+const TRIGGER_CATEGORY_AUTO_SAVE_M = `mutation TriggerCategoryAutoSaveRule($id: ID!, $monthYear: String) {
+  triggerCategoryAutoSaveRule(id: $id, monthYear: $monthYear) {
+    ruleId monthYear category status
+    microContributionId
+    shortfall {
+      currentAmount averageAmount shortfallAmount shortfallPct
+      hasSufficientHistory shouldTrigger lookbackMonthsAnalyzed
+      lookback { monthYear amount txCount }
+    }
+  }
+}`;
+
+const RUN_CATEGORY_AUTO_SAVE_FOR_ME_M = `mutation RunCategoryAutoSaveForMe($monthYear: String) {
+  runCategoryAutoSaveForMe(monthYear: $monthYear) {
+    ruleId monthYear category status
+    microContributionId
+    shortfall {
+      currentAmount averageAmount shortfallAmount shortfallPct
+      hasSufficientHistory shouldTrigger lookbackMonthsAnalyzed
+      lookback { monthYear amount txCount }
+    }
+  }
+}`;
+
+export function useCategoryAutoSaveRules() {
+  return useQuery({
+    queryKey: ['category-auto-save-rules'],
+    queryFn: () =>
+      gqlFetcher<{ categoryAutoSaveRules: CategoryAutoSaveRule[] }, undefined>(
+        CATEGORY_AUTO_SAVE_RULES_Q,
+      ),
+    select: (d) => d.categoryAutoSaveRules,
+  });
+}
+
+export function usePreviewCategoryAutoSave(args: {
+  category: SpendingCategory | null;
+  lookbackMonths?: number;
+  monthYear?: string;
+}) {
+  return useQuery({
+    queryKey: [
+      'preview-category-auto-save',
+      args.category,
+      args.lookbackMonths ?? 3,
+      args.monthYear ?? null,
+    ],
+    enabled: Boolean(args.category),
+    queryFn: () =>
+      gqlFetcher<
+        { previewCategoryAutoSave: CategoryAutoSaveShortfall },
+        { category: SpendingCategory; lookbackMonths?: number; monthYear?: string }
+      >(PREVIEW_CATEGORY_AUTO_SAVE_Q, {
+        category: args.category as SpendingCategory,
+        lookbackMonths: args.lookbackMonths ?? 3,
+        monthYear: args.monthYear,
+      }),
+    select: (d) => d.previewCategoryAutoSave,
+  });
+}
+
+export function useCreateCategoryAutoSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { category: SpendingCategory; lookbackMonths?: number }) =>
+      gqlFetcher<
+        { createCategoryAutoSaveRule: CategoryAutoSaveRule },
+        { category: SpendingCategory; lookbackMonths?: number }
+      >(CREATE_CATEGORY_AUTO_SAVE_M, vars),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      toast.success('Otomatik fark kuralı oluşturuldu');
+    },
+    onError: (e: Error) => toast.error('Kural oluşturulamadı', { description: e.message }),
+  });
+}
+
+export function useDeleteCategoryAutoSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<{ deleteCategoryAutoSaveRule: boolean }, { id: string }>(
+        DELETE_CATEGORY_AUTO_SAVE_M,
+        { id },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      toast.success('Kural silindi');
+    },
+    onError: (e: Error) => toast.error('Silinemedi', { description: e.message }),
+  });
+}
+
+export function useSetCategoryAutoSaveRuleActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; active: boolean }) =>
+      gqlFetcher<
+        { setCategoryAutoSaveRuleActive: { id: string; active: boolean } },
+        { id: string; active: boolean }
+      >(SET_CATEGORY_AUTO_SAVE_ACTIVE_M, vars),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+    },
+    onError: (e: Error) => toast.error('Güncellenemedi', { description: e.message }),
+  });
+}
+
+export function useTriggerCategoryAutoSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; monthYear?: string }) =>
+      gqlFetcher<
+        { triggerCategoryAutoSaveRule: CategoryAutoSaveOutcome },
+        { id: string; monthYear?: string }
+      >(TRIGGER_CATEGORY_AUTO_SAVE_M, vars),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['contribution-summary'] });
+      const o = data.triggerCategoryAutoSaveRule;
+      if (o.status === 'TRIGGERED') {
+        toast.success('Fark katkıya aktarıldı', {
+          description: `${o.shortfall.shortfallAmount.toLocaleString('tr-TR')} ₺ emeklilik katkına eklendi.`,
+        });
+      } else if (o.status === 'SKIPPED_ALREADY_TRIGGERED') {
+        toast.info('Bu ay zaten tetiklenmiş');
+      } else if (o.status === 'SKIPPED_INSUFFICIENT_HISTORY') {
+        toast.info('Yeterli geçmiş veri yok', {
+          description: 'Bu kategori için önceki aylarda işlem bulunamadı.',
+        });
+      } else if (o.status === 'SKIPPED_NO_SHORTFALL') {
+        toast.info('Bu ay ortalamanın üstünde', {
+          description: 'Bu ay bu kategoride ortalamanın altında değilsin — fark üretilmedi.',
+        });
+      }
+    },
+    onError: (e: Error) => toast.error('Tetikleme başarısız', { description: e.message }),
+  });
+}
+
+export function useRunCategoryAutoSaveForMe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars?: { monthYear?: string }) =>
+      gqlFetcher<{ runCategoryAutoSaveForMe: CategoryAutoSaveOutcome[] }, { monthYear?: string }>(
+        RUN_CATEGORY_AUTO_SAVE_FOR_ME_M,
+        vars ?? {},
+      ),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['contribution-summary'] });
+      const triggered = data.runCategoryAutoSaveForMe.filter((o) => o.status === 'TRIGGERED');
+      if (triggered.length > 0) {
+        const total = triggered.reduce((s, o) => s + o.shortfall.shortfallAmount, 0);
+        toast.success(`${triggered.length} kategoride fark aktarıldı`, {
+          description: `Toplam ${total.toLocaleString('tr-TR')} ₺ emeklilik katkına eklendi.`,
+        });
+      } else {
+        toast.info('Bu ay aktarılacak fark yok');
+      }
+    },
+    onError: (e: Error) => toast.error('Çalıştırma başarısız', { description: e.message }),
+  });
+}

@@ -144,8 +144,36 @@ model User {
   analysisRuns       AnalysisRun[]
   microContributions MicroContribution[]
   chatSessions       ChatSession[]
+  categoryAutoSaveRules CategoryAutoSaveRule[]
 
   @@index([authId])
+}
+
+/// Kullanici "kahve", "yemek siparisi" gibi belirli kategoriler icin
+/// "ortalama-altinda harcadigimda farki otomatik tasarrufa donustur"
+/// tercihi tanimlar. Her ay maksimum 1 kez tetiklenir; idempotency
+/// MicroContribution.sourceRef ile saglanir.
+model CategoryAutoSaveRule {
+  id             String           @id @default(cuid())
+  userId         String
+  category       SpendingCategory
+  /// Kac aylik gecmis ortalama alinacak (default 3).
+  lookbackMonths Int              @default(3)
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  /// Bilgi amacli — son tetikleme zamani (denetim / debug icin).
+  lastTriggeredAt DateTime?
+  /// "YYYY-MM" — en son hangi ay icin tetiklendi (kullaniciya gosterim icin).
+  lastTriggeredMonth String?
+  /// En son tetiklemede aktarilan tutar (TL).
+  lastTransferAmount Decimal?     @db.Money
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Bir kullanici ayni kategoride yalnizca bir kez tanimlayabilir.
+  @@unique([userId, category])
+  @@index([userId, active])
 }
 
 model BankConnection {

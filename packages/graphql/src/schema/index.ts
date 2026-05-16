@@ -17,6 +17,7 @@ import './chat';
 import './learn';
 import './finance-news';
 import './rule';
+import './category-auto-save';
 
 import { builder } from '../builder';
 
