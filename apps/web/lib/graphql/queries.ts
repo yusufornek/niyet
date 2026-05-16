@@ -463,8 +463,8 @@ const CHAT_SESSION_Q = `query ChatSession($id: ID!) {
     messages { id role content toolName tokensUsed createdAt }
   }
 }`;
-const SEND_CHAT_M = `mutation SendChatMessage($message: String!, $sessionId: ID, $goalContext: String) {
-  sendChatMessage(message: $message, sessionId: $sessionId, goalContext: $goalContext) {
+const SEND_CHAT_M = `mutation SendChatMessage($message: String!, $sessionId: ID, $goalContext: String, $goalId: ID) {
+  sendChatMessage(message: $message, sessionId: $sessionId, goalContext: $goalContext, goalId: $goalId) {
     sessionId reply totalTokens geminiModel stubMode
     recommendation { actionType label targetRef reasoning }
   }
@@ -1211,10 +1211,15 @@ export const useChatSession = (id: string | null) =>
 export function useSendChatMessage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { message: string; sessionId?: string; goalContext?: string }) =>
+    mutationFn: (vars: {
+      message: string;
+      sessionId?: string;
+      goalContext?: string;
+      goalId?: string;
+    }) =>
       gqlFetcher<
         { sendChatMessage: SendMessageResponse },
-        { message: string; sessionId?: string; goalContext?: string }
+        { message: string; sessionId?: string; goalContext?: string; goalId?: string }
       >(SEND_CHAT_M, vars),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ['chatSession', data.sendChatMessage.sessionId] });
