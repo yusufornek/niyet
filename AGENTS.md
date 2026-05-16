@@ -77,6 +77,8 @@ Bir agent branch açıp **48 saatten fazla** commit atmadıysa branch "stale" sa
 
 Aşağıdaki adımları sırasıyla uygula. Kopyala-yapıştır.
 
+> **Zorunlu kural**: Her yeni feature/iş için **yeni branch aç**. Eski feature branch'ine yeni feature ekleme.
+
 ```bash
 # 1. Branch aç
 # Format: <tip>/<konu-kebab-case>   (max ~50 karakter; çok uzunsa kısalt)

@@ -46,3 +46,7 @@ export const ContributionStatusRef = builder.enumType(ContributionStatus, {
 export const PeriodEnum = builder.enumType('Period', {
   values: ['LAST_7D', 'LAST_30D', 'LAST_90D', 'ALL'] as const,
 });
+
+export const RiskProfileRef = builder.enumType('RiskProfile', {
+  values: ['VERY_LOW', 'LOW', 'BALANCED', 'HIGH', 'VERY_HIGH'] as const,
+});

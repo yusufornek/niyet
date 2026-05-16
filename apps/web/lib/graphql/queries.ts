@@ -285,6 +285,19 @@ export interface GoalPriceRefreshResult {
   alert: GoalPriceAlert | null;
 }
 
+export type RiskProfile = 'VERY_LOW' | 'LOW' | 'BALANCED' | 'HIGH' | 'VERY_HIGH';
+
+export interface FundRecommendation {
+  id: string;
+  name: string;
+  summary: string;
+  riskBand: RiskProfile;
+  horizonBand: 'SHORT' | 'MEDIUM' | 'LONG';
+  expectedReturnBand: string;
+  whyFits: string;
+  score: number;
+}
+
 export interface InflationRate {
   annualRate: number;
   monthlyRate: number | null;
@@ -555,6 +568,11 @@ const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {
     remainingAmountImpact monthlySavingNeeded readAt createdAt
   }
 }`;
+const FUND_RECOMMENDATIONS_Q = `query FundRecommendations($input: FundRecommendationInput!) {
+  fundRecommendations(input: $input) {
+    id name summary riskBand horizonBand expectedReturnBand whyFits score
+  }
+}`;
 const LATEST_INFLATION_RATE_Q = `query LatestInflationRate {
   latestInflationRate {
     annualRate monthlyRate period publishedAt source sourceUrl
@@ -721,6 +739,29 @@ export const useGoalPriceAlerts = (unreadOnly = false) =>
         },
       ),
     staleTime: 30_000,
+  });
+
+export const useFundRecommendations = (input: {
+  riskProfile: RiskProfile;
+  targetYears?: number;
+  goalId?: string;
+  enabled?: boolean;
+}) =>
+  useQuery({
+    queryKey: ['fundRecommendations', input.riskProfile, input.targetYears, input.goalId],
+    queryFn: () =>
+      gqlFetcher<
+        { fundRecommendations: FundRecommendation[] },
+        { input: { riskProfile: RiskProfile; targetYears?: number; goalId?: string } }
+      >(FUND_RECOMMENDATIONS_Q, {
+        input: {
+          riskProfile: input.riskProfile,
+          ...(input.targetYears !== undefined ? { targetYears: input.targetYears } : {}),
+          ...(input.goalId ? { goalId: input.goalId } : {}),
+        },
+      }),
+    staleTime: 60_000,
+    enabled: input.enabled ?? true,
   });
 
 export const useLatestInflationRate = () =>
