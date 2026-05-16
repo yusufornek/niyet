@@ -19,6 +19,7 @@ import type { ReactNode } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
 import { RulesWidget } from '@/components/rules-widget';
+import { SavingsProjectionWidget } from '@/components/savings-projection-widget';
 import { ScoreCard } from '@/components/score-card';
 import {
   useDashboard,
@@ -105,6 +106,10 @@ export default function DashboardPage() {
           },
         ]}
       />
+
+      <div className="mb-3">
+        <SavingsProjectionWidget />
+      </div>
 
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Link href="/radar" className="ny-card text-left">

@@ -53,6 +53,7 @@ export interface DashboardStats {
   activeGoalsCount: number;
   totalAcceptedContributions: number;
   acceptedContributionsLast30d: number;
+  todayOpportunity: number;
 }
 
 export type ContributionSource =
@@ -410,6 +411,7 @@ const DASHBOARD_Q = `query Dashboard {
     totalSpentLast30d totalOpportunityLast30d txCountLast30d weeklySaved
     activeRulesCount activeGoalsCount
     totalAcceptedContributions acceptedContributionsLast30d
+    todayOpportunity
   }
 }`;
 const CATEGORY_BREAKDOWN_Q = `query CategoryBreakdown($period: Period!) {
@@ -1359,5 +1361,48 @@ export function useTriggerRule() {
       });
     },
     onError: (e: Error) => toast.error('Kural tetiklenemedi', { description: e.message }),
+  });
+}
+
+// ───────────────────────────────────────────────────────────
+// Savings Projection — PBI: bugünkü tasarrufun aylık/yıllık/uzun vadeli etkisi
+// ───────────────────────────────────────────────────────────
+
+export interface SavingsHorizonPoint {
+  years: number;
+  totalAmount: number;
+  totalContributed: number;
+  growth: number;
+}
+
+export interface SavingsProjection {
+  todayAmount: number;
+  monthlyAmount: number;
+  yearlyAmount: number;
+  horizon: SavingsHorizonPoint[];
+  annualReturnPct: number;
+  isEstimated: boolean;
+}
+
+const SAVINGS_PROJECTION_Q = `query SavingsProjection($annualReturnPct: Float) {
+  savingsProjection(annualReturnPct: $annualReturnPct) {
+    todayAmount
+    monthlyAmount
+    yearlyAmount
+    annualReturnPct
+    isEstimated
+    horizon { years totalAmount totalContributed growth }
+  }
+}`;
+
+export function useSavingsProjection(annualReturnPct?: number) {
+  return useQuery({
+    queryKey: ['savingsProjection', annualReturnPct ?? 5],
+    queryFn: () =>
+      gqlFetcher<{ savingsProjection: SavingsProjection }, { annualReturnPct?: number }>(
+        SAVINGS_PROJECTION_Q,
+        { annualReturnPct },
+      ),
+    select: (data) => data.savingsProjection,
   });
 }
