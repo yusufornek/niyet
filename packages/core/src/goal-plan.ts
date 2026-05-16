@@ -112,3 +112,107 @@ function monthsUntil(targetDate: Date, now: Date): number {
   );
   return Math.max(Math.ceil(remainingDays / 30), 1);
 }
+
+// ─────────────────────────────────────────────────────────────
+// Goal Contribution Simulator — interaktif "ne olur eğer" hesabı
+// PBI: "aylık katkımı artırırsam veya azaltırsam ne zaman ulaşırım"
+// ─────────────────────────────────────────────────────────────
+
+export interface GoalContributionSimulation {
+  /** Simüle edilen aylık katkı (girilen değer, echo) */
+  monthlyContribution: number;
+  /** Mevcut hızla projeksiyon ay sayısı. Katkı 0 ise null. */
+  projectedMonthsToGoal: number | null;
+  /** Projeksiyon tarihi (now + projectedMonthsToGoal ay). Null ise null. */
+  projectedEtaDate: Date | null;
+  /** Hedef tarihine kalan ay sayısı (hedef için referans) */
+  targetMonthsRemaining: number;
+  /**
+   * Projeksiyon vs hedef arasındaki ay farkı.
+   * - Pozitif: hedef tarihinden N ay geç ulaşır
+   * - Negatif: hedef tarihinden |N| ay erken ulaşır
+   * - 0: tam zamanında
+   * - null: katkı 0, ulaşılmıyor
+   */
+  monthsDelta: number | null;
+  /** Hedef tarihine yetişme seviyesi (UI badge için) */
+  level: GoalPlanLevel;
+}
+
+/**
+ * Pure simulator — slider'a/input'a göre anlık hesap.
+ *
+ * Backend `buildGoalSavingsPlan` "önerilen katkı" hesaplar (kullanıcı davranışı
+ * + gelir kapasitesi); bu fonksiyon ise "verilen katkı ile ne olur" sorusuna
+ * cevap verir. UI slider'ında her değişikte mikro-saniyede çalışır.
+ *
+ * Level karar mantığı:
+ * - projected null veya target'tan çok büyük (>%25 sapma) → AT_RISK
+ * - projected target'tan büyük ama az sapma → STRETCH
+ * - projected ≤ target → ON_TRACK
+ *
+ * Edge cases:
+ * - monthlyContribution ≤ 0: projected=null, monthsDelta=null, level=AT_RISK
+ * - remainingAmount ≤ 0: projected=0, projectedEtaDate=now, level=ON_TRACK
+ *   (hedef zaten tamamlanmış)
+ * - targetDate geçmişte: targetMonthsRemaining=1 (monthsUntil clamp eder)
+ */
+export function simulateGoalContribution(input: {
+  monthlyContribution: number;
+  remainingAmount: number;
+  targetDate: Date;
+  now?: Date;
+}): GoalContributionSimulation {
+  const now = input.now ?? new Date();
+  const monthlyContribution = Math.max(0, input.monthlyContribution);
+  const remainingAmount = Math.max(0, input.remainingAmount);
+  const targetMonthsRemaining = monthsUntil(input.targetDate, now);
+
+  // Hedef zaten tamamlanmış
+  if (remainingAmount === 0) {
+    return {
+      monthlyContribution: roundMoney(monthlyContribution),
+      projectedMonthsToGoal: 0,
+      projectedEtaDate: new Date(now),
+      targetMonthsRemaining,
+      monthsDelta: -targetMonthsRemaining,
+      level: 'ON_TRACK',
+    };
+  }
+
+  // Katkı yok → ulaşılamıyor
+  if (monthlyContribution === 0) {
+    return {
+      monthlyContribution: 0,
+      projectedMonthsToGoal: null,
+      projectedEtaDate: null,
+      targetMonthsRemaining,
+      monthsDelta: null,
+      level: 'AT_RISK',
+    };
+  }
+
+  const projectedMonthsToGoal = Math.ceil(remainingAmount / monthlyContribution);
+  const projectedEtaDate = new Date(now);
+  projectedEtaDate.setMonth(projectedEtaDate.getMonth() + projectedMonthsToGoal);
+  const monthsDelta = projectedMonthsToGoal - targetMonthsRemaining;
+
+  let level: GoalPlanLevel;
+  if (monthsDelta <= 0) {
+    level = 'ON_TRACK';
+  } else if (monthsDelta / Math.max(1, targetMonthsRemaining) <= 0.25) {
+    // hedef tarihinden ≤%25 fazla → STRETCH (ulaşılabilir ama sıkı)
+    level = 'STRETCH';
+  } else {
+    level = 'AT_RISK';
+  }
+
+  return {
+    monthlyContribution: roundMoney(monthlyContribution),
+    projectedMonthsToGoal,
+    projectedEtaDate,
+    targetMonthsRemaining,
+    monthsDelta,
+    level,
+  };
+}
