@@ -1795,3 +1795,222 @@ export function useRunCategoryAutoSaveForMe() {
     onError: (e: Error) => toast.error('Çalıştırma başarısız', { description: e.message }),
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// Category Spending Alert — PBI: kategoride aylık limite yaklaştığında uyarı
+// ─────────────────────────────────────────────────────────────
+
+export type CategorySpendingAlertLevel = 'BELOW' | 'WARNING' | 'OVER';
+
+export interface CategorySpendingAlertRow {
+  id: string;
+  category: SpendingCategory;
+  monthlyLimit: number;
+  warnThresholdPct: number;
+  active: boolean;
+  lastAlertedMonth: string | null;
+  lastAlertedLevel: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategorySpendingEvaluation {
+  category: SpendingCategory;
+  monthYear: string;
+  monthlyLimit: number;
+  spentAmount: number;
+  remainingAmount: number;
+  utilizationPct: number;
+  warnThresholdPct: number;
+  level: CategorySpendingAlertLevel;
+}
+
+export interface CategorySpendingAlertOutcome {
+  alertId: string;
+  category: SpendingCategory;
+  evaluation: CategorySpendingEvaluation;
+  notificationCreated: boolean;
+  notificationId: string | null;
+  skippedReason: string | null;
+}
+
+const CATEGORY_SPENDING_ALERTS_Q = `query CategorySpendingAlerts {
+  categorySpendingAlerts {
+    id category monthlyLimit warnThresholdPct active
+    lastAlertedMonth lastAlertedLevel createdAt updatedAt
+  }
+}`;
+
+const PREVIEW_CATEGORY_SPENDING_ALERT_Q = `query PreviewCategorySpendingAlert(
+  $category: SpendingCategory!, $monthlyLimit: Float!, $warnThresholdPct: Float, $monthYear: String
+) {
+  previewCategorySpendingAlert(
+    category: $category, monthlyLimit: $monthlyLimit,
+    warnThresholdPct: $warnThresholdPct, monthYear: $monthYear
+  ) {
+    category monthYear monthlyLimit spentAmount remainingAmount
+    utilizationPct warnThresholdPct level
+  }
+}`;
+
+const CREATE_CATEGORY_SPENDING_ALERT_M = `mutation CreateCategorySpendingAlert(
+  $category: SpendingCategory!, $monthlyLimit: Float!, $warnThresholdPct: Float
+) {
+  createCategorySpendingAlert(
+    category: $category, monthlyLimit: $monthlyLimit, warnThresholdPct: $warnThresholdPct
+  ) {
+    id category monthlyLimit warnThresholdPct active createdAt
+  }
+}`;
+
+const UPDATE_CATEGORY_SPENDING_ALERT_M = `mutation UpdateCategorySpendingAlert(
+  $id: ID!, $monthlyLimit: Float, $warnThresholdPct: Float, $active: Boolean
+) {
+  updateCategorySpendingAlert(
+    id: $id, monthlyLimit: $monthlyLimit, warnThresholdPct: $warnThresholdPct, active: $active
+  ) {
+    id monthlyLimit warnThresholdPct active
+  }
+}`;
+
+const DELETE_CATEGORY_SPENDING_ALERT_M = `mutation DeleteCategorySpendingAlert($id: ID!) {
+  deleteCategorySpendingAlert(id: $id)
+}`;
+
+const EVALUATE_MY_CATEGORY_SPENDING_ALERTS_M = `mutation EvaluateMyCategorySpendingAlerts($monthYear: String) {
+  evaluateMyCategorySpendingAlerts(monthYear: $monthYear) {
+    alertId category notificationCreated notificationId skippedReason
+    evaluation {
+      category monthYear monthlyLimit spentAmount remainingAmount
+      utilizationPct warnThresholdPct level
+    }
+  }
+}`;
+
+export function useCategorySpendingAlerts() {
+  return useQuery({
+    queryKey: ['category-spending-alerts'],
+    queryFn: () =>
+      gqlFetcher<{ categorySpendingAlerts: CategorySpendingAlertRow[] }, undefined>(
+        CATEGORY_SPENDING_ALERTS_Q,
+      ),
+    select: (d) => d.categorySpendingAlerts,
+  });
+}
+
+export function usePreviewCategorySpendingAlert(args: {
+  category: SpendingCategory | null;
+  monthlyLimit: number;
+  warnThresholdPct?: number;
+  monthYear?: string;
+}) {
+  return useQuery({
+    queryKey: [
+      'preview-category-spending-alert',
+      args.category,
+      args.monthlyLimit,
+      args.warnThresholdPct ?? 0.8,
+      args.monthYear ?? null,
+    ],
+    enabled: Boolean(args.category) && args.monthlyLimit > 0,
+    queryFn: () =>
+      gqlFetcher<
+        { previewCategorySpendingAlert: CategorySpendingEvaluation },
+        {
+          category: SpendingCategory;
+          monthlyLimit: number;
+          warnThresholdPct?: number;
+          monthYear?: string;
+        }
+      >(PREVIEW_CATEGORY_SPENDING_ALERT_Q, {
+        category: args.category as SpendingCategory,
+        monthlyLimit: args.monthlyLimit,
+        warnThresholdPct: args.warnThresholdPct,
+        monthYear: args.monthYear,
+      }),
+    select: (d) => d.previewCategorySpendingAlert,
+  });
+}
+
+export function useCreateCategorySpendingAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      category: SpendingCategory;
+      monthlyLimit: number;
+      warnThresholdPct?: number;
+    }) =>
+      gqlFetcher<
+        { createCategorySpendingAlert: CategorySpendingAlertRow },
+        { category: SpendingCategory; monthlyLimit: number; warnThresholdPct?: number }
+      >(CREATE_CATEGORY_SPENDING_ALERT_M, vars),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-spending-alerts'] });
+      toast.success('Limit uyarısı eklendi');
+    },
+    onError: (e: Error) => toast.error('Limit eklenemedi', { description: e.message }),
+  });
+}
+
+export function useUpdateCategorySpendingAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      monthlyLimit?: number;
+      warnThresholdPct?: number;
+      active?: boolean;
+    }) =>
+      gqlFetcher<{ updateCategorySpendingAlert: CategorySpendingAlertRow }, typeof vars>(
+        UPDATE_CATEGORY_SPENDING_ALERT_M,
+        vars,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-spending-alerts'] });
+    },
+    onError: (e: Error) => toast.error('Güncellenemedi', { description: e.message }),
+  });
+}
+
+export function useDeleteCategorySpendingAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<{ deleteCategorySpendingAlert: boolean }, { id: string }>(
+        DELETE_CATEGORY_SPENDING_ALERT_M,
+        { id },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-spending-alerts'] });
+      toast.success('Limit silindi');
+    },
+    onError: (e: Error) => toast.error('Silinemedi', { description: e.message }),
+  });
+}
+
+export function useEvaluateMyCategorySpendingAlerts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars?: { monthYear?: string }) =>
+      gqlFetcher<
+        { evaluateMyCategorySpendingAlerts: CategorySpendingAlertOutcome[] },
+        { monthYear?: string }
+      >(EVALUATE_MY_CATEGORY_SPENDING_ALERTS_M, vars ?? {}),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['category-spending-alerts'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+      const fired = data.evaluateMyCategorySpendingAlerts.filter((o) => o.notificationCreated);
+      if (fired.length > 0) {
+        const overCount = fired.filter((o) => o.evaluation.level === 'OVER').length;
+        const warnCount = fired.filter((o) => o.evaluation.level === 'WARNING').length;
+        const desc: string[] = [];
+        if (overCount > 0) desc.push(`${overCount} kategoride limit aşıldı`);
+        if (warnCount > 0) desc.push(`${warnCount} kategoride limit yaklaşıyor`);
+        toast.warning('Harcama uyarısı', { description: desc.join(', ') });
+      } else {
+        toast.info('Tüm kategorilerin limit altında');
+      }
+    },
+    onError: (e: Error) => toast.error('Değerlendirme başarısız', { description: e.message }),
+  });
+}

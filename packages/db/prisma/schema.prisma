@@ -148,8 +148,36 @@ model User {
   microContributions MicroContribution[]
   chatSessions       ChatSession[]
   categoryAutoSaveRules CategoryAutoSaveRule[]
+  categorySpendingAlerts CategorySpendingAlert[]
 
   @@index([authId])
+}
+
+/// Kullanici "azaltmak istedigim kategorilerde harcamam limite yaklasinca uyar"
+/// tercihini tanimlar. Her ay maksimum 1 WARNING (>=warnThresholdPct) + 1 OVER
+/// (>=%100) notification uretilir; idempotency lastAlertedMonth+lastAlertedLevel
+/// ile saglanir.
+model CategorySpendingAlert {
+  id                 String           @id @default(cuid())
+  userId             String
+  category           SpendingCategory
+  /// Aylik harcama limiti (TL). > 0 olmali.
+  monthlyLimit       Decimal          @db.Money
+  /// Erken uyari esigi (0-1). Default 0.8 = %80.
+  warnThresholdPct   Decimal          @default(0.8) @db.Decimal(4, 3)
+  active             Boolean          @default(true)
+  /// "YYYY-MM" — en son notification uretilen ay.
+  lastAlertedMonth   String?
+  /// "WARNING" veya "OVER" — ayni ay icin level upgrade durumunda tekrar uretebilir.
+  lastAlertedLevel   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Bir kullanici ayni kategoride yalnizca bir limit tanimlayabilir.
+  @@unique([userId, category])
+  @@index([userId, active])
 }
 
 /// Kullanici "kahve", "yemek siparisi" gibi belirli kategoriler icin
