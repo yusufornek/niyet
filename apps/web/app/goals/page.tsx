@@ -211,7 +211,10 @@ export default function GoalsPage() {
         </button>
       </div>
 
-      <Link href="/funds" className="text-primary mt-5 block w-full text-center text-sm">
+      <Link
+        href={goals[0] ? `/funds?goalId=${goals[0].id}` : '/funds'}
+        className="text-primary mt-5 block w-full text-center text-sm"
+      >
         Fon seçeneklerini incele →
       </Link>
     </PhoneShell>

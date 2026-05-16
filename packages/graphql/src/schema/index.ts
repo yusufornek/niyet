@@ -14,6 +14,7 @@ import './notification';
 import './analysis';
 import './micro-contribution';
 import './chat';
+import './fund';
 
 import { builder } from '../builder';
 

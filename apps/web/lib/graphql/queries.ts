@@ -248,6 +248,19 @@ export interface GoalPriceRefreshResult {
   alert: GoalPriceAlert | null;
 }
 
+export type RiskProfile = 'VERY_LOW' | 'LOW' | 'BALANCED' | 'HIGH' | 'VERY_HIGH';
+
+export interface FundRecommendation {
+  id: string;
+  name: string;
+  summary: string;
+  riskBand: RiskProfile;
+  horizonBand: 'SHORT' | 'MEDIUM' | 'LONG';
+  expectedReturnBand: string;
+  whyFits: string;
+  score: number;
+}
+
 export interface FutureScore {
   id: string;
   score: number;
@@ -421,6 +434,11 @@ const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {
     remainingAmountImpact monthlySavingNeeded readAt createdAt
   }
 }`;
+const FUND_RECOMMENDATIONS_Q = `query FundRecommendations($input: FundRecommendationInput!) {
+  fundRecommendations(input: $input) {
+    id name summary riskBand horizonBand expectedReturnBand whyFits score
+  }
+}`;
 const FUTURE_SCORE_Q = `query FutureScore {
   futureScore { id score contribution discipline consistency social computedAt }
 }`;
@@ -526,10 +544,36 @@ export const useGoalPriceAlerts = (unreadOnly = false) =>
   useQuery({
     queryKey: ['goalPriceAlerts', unreadOnly],
     queryFn: () =>
-      gqlFetcher<{ goalPriceAlerts: GoalPriceAlert[] }, { unreadOnly: boolean }>(GOAL_PRICE_ALERTS_Q, {
-        unreadOnly,
-      }),
+      gqlFetcher<{ goalPriceAlerts: GoalPriceAlert[] }, { unreadOnly: boolean }>(
+        GOAL_PRICE_ALERTS_Q,
+        {
+          unreadOnly,
+        },
+      ),
     staleTime: 30_000,
+  });
+
+export const useFundRecommendations = (input: {
+  riskProfile: RiskProfile;
+  targetYears?: number;
+  goalId?: string;
+  enabled?: boolean;
+}) =>
+  useQuery({
+    queryKey: ['fundRecommendations', input.riskProfile, input.targetYears, input.goalId],
+    queryFn: () =>
+      gqlFetcher<
+        { fundRecommendations: FundRecommendation[] },
+        { input: { riskProfile: RiskProfile; targetYears?: number; goalId?: string } }
+      >(FUND_RECOMMENDATIONS_Q, {
+        input: {
+          riskProfile: input.riskProfile,
+          ...(input.targetYears !== undefined ? { targetYears: input.targetYears } : {}),
+          ...(input.goalId ? { goalId: input.goalId } : {}),
+        },
+      }),
+    staleTime: 60_000,
+    enabled: input.enabled ?? true,
   });
 
 export const useFutureScore = () =>
@@ -750,9 +794,12 @@ export function useNormalizeGoalProductQuery() {
 export function useSearchGoalProducts() {
   return useMutation({
     mutationFn: (query: string) =>
-      gqlFetcher<{ searchGoalProducts: ProductSearchResult[] }, { query: string }>(SEARCH_GOAL_PRODUCTS_M, {
-        query,
-      }),
+      gqlFetcher<{ searchGoalProducts: ProductSearchResult[] }, { query: string }>(
+        SEARCH_GOAL_PRODUCTS_M,
+        {
+          query,
+        },
+      ),
   });
 }
 
@@ -783,10 +830,10 @@ export function useMarkGoalPriceAlertRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (alertId: string) =>
-      gqlFetcher<{ markGoalPriceAlertRead: { id: string; readAt: string | null } }, { alertId: string }>(
-        MARK_GOAL_ALERT_READ_M,
-        { alertId },
-      ),
+      gqlFetcher<
+        { markGoalPriceAlertRead: { id: string; readAt: string | null } },
+        { alertId: string }
+      >(MARK_GOAL_ALERT_READ_M, { alertId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['goalPriceAlerts'] });
     },
