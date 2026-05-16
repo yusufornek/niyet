@@ -58,6 +58,7 @@ export default function ChatbotClient() {
         message,
         sessionId: sessionId ?? undefined,
         goalContext: goalContext ?? undefined,
+        goalId: goalIdParam ?? undefined,
       });
       setSessionId(result.sendChatMessage.sessionId);
       setLastRecommendation(result.sendChatMessage.recommendation);

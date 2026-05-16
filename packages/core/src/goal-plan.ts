@@ -1,4 +1,5 @@
 import { calculateMonthlySavingNeeded, roundMoney } from './goal-tracking';
+import type { SpendingCategory } from './types';
 
 export type GoalPlanLevel = 'ON_TRACK' | 'STRETCH' | 'AT_RISK';
 
@@ -215,4 +216,142 @@ export function simulateGoalContribution(input: {
     monthsDelta,
     level,
   };
+}
+// ─────────────────────────────────────────────────────────────
+// Goal Acceleration — kategori kesimi → ETA shave hesabı
+// PBI: "hangi kategorilerde tasarruf yaparak hedefime yaklaşabileceğimi"
+// ─────────────────────────────────────────────────────────────
+
+/** Bir kategori için "şu kadar kesersen hedef şu kadar erken" senaryosu */
+export interface CategoryAccelerationOption {
+  category: SpendingCategory;
+  /** Bu kategoride aylık tasarruf fırsatı (TL) — son 30 gün opportunity toplamı */
+  monthlyOpportunity: number;
+  /** Pratik olarak kesilebilir tutar (opportunity × cutRatio) */
+  reasonableMonthlyCut: number;
+  /** Bu kesim eklenince yeni ETA (ay). Hedef erişilemezse Infinity. */
+  newEtaMonths: number;
+  /** Mevcut ETA'dan kaç ay erken (ay). Infinity ya da 0 olabilir. */
+  monthsShaved: number;
+}
+
+export interface CombinedAccelerationScenario {
+  /** Senaryoyu oluşturan kategoriler */
+  categories: SpendingCategory[];
+  /** Toplam ek aylık kesim */
+  totalMonthlyCut: number;
+  /** Yeni ETA (ay) */
+  newEtaMonths: number;
+  /** Mevcut ETA'dan kaç ay erken */
+  monthsShaved: number;
+}
+
+export interface GoalAccelerationPlan {
+  /** Mevcut katkı oranıyla ETA (ay). Katkı 0 ise Infinity. */
+  currentEtaMonths: number;
+  /** Mevcut aylık katkı (girilen değer, kontrol kolaylığı için echo) */
+  currentMonthlyContribution: number;
+  /** Kalan tutar (girilen, echo) */
+  remainingAmount: number;
+  /** Kategori-bazlı seçenekler — opportunity'ye göre azalan sırada (max 5) */
+  categoryOptions: CategoryAccelerationOption[];
+  /** Top 3 kategoriyi birleşik kesme senaryosu */
+  topThreeCombined: CombinedAccelerationScenario;
+  /** En kolay (en yüksek opportunity'li tek kategori) senaryosu */
+  easiestSingle: CategoryAccelerationOption | null;
+}
+
+export const DEFAULT_CATEGORY_CUT_RATIO = 0.7;
+
+/**
+ * Pure function — bir hedefin kategori kesimleriyle ne kadar hızlanacağını hesapla.
+ *
+ * AI Coach `simulate_goal_acceleration` tool'undan çağrılır. UI agnostic, DB
+ * agnostic; sadece sayılar alır, sayılar döner.
+ *
+ * Strateji:
+ * - `cutRatio` (default 0.7): bir kategorideki fırsatın gerçekten kesilebilen
+ *   yüzdesi. %100 kesmek pratik değil ("kahveden hiç içme" gerçekçi değil).
+ * - ETA = remainingAmount / monthlyContribution (yuvarlanır up).
+ * - Yeni ETA = remainingAmount / (monthlyContribution + extraReduction).
+ * - `topThreeCombined`: en yüksek opportunity'li 3 kategorinin reasonableCut
+ *   toplamı kesilirse senaryosu.
+ * - `easiestSingle`: tek kategoride en yüksek shave (genelde top opportunity).
+ *
+ * Edge cases:
+ * - remainingAmount <= 0: ETA = 0, tüm shave = 0.
+ * - currentMonthlyContribution <= 0: currentEta = Infinity; kesim varsa
+ *   monthsShaved = Infinity (UI "Şu an hiç biriktirmiyorsun" mesajı verir).
+ * - Kategori opportunity = 0: option çıkarılmaz (boş array dönebilir).
+ */
+export function calculateGoalAcceleration(input: {
+  remainingAmount: number;
+  currentMonthlyContribution: number;
+  categoryOpportunities: Array<{ category: SpendingCategory; monthlyOpportunity: number }>;
+  cutRatio?: number;
+}): GoalAccelerationPlan {
+  const remainingAmount = Math.max(0, input.remainingAmount);
+  const currentMonthlyContribution = Math.max(0, input.currentMonthlyContribution);
+  const cutRatio = clamp01(input.cutRatio ?? DEFAULT_CATEGORY_CUT_RATIO);
+
+  const currentEtaMonths = etaMonths(remainingAmount, currentMonthlyContribution);
+
+  // Filtrele: pozitif opportunity olanlar, sırala azalan, top 5 al
+  const categoryOptions: CategoryAccelerationOption[] = input.categoryOpportunities
+    .filter((c) => c.monthlyOpportunity > 0)
+    .sort((a, b) => b.monthlyOpportunity - a.monthlyOpportunity)
+    .slice(0, 5)
+    .map((c) => {
+      const reasonableMonthlyCut = roundMoney(c.monthlyOpportunity * cutRatio);
+      const newEta = etaMonths(remainingAmount, currentMonthlyContribution + reasonableMonthlyCut);
+      const shaved = monthsShavedBetween(currentEtaMonths, newEta);
+      return {
+        category: c.category,
+        monthlyOpportunity: roundMoney(c.monthlyOpportunity),
+        reasonableMonthlyCut,
+        newEtaMonths: newEta,
+        monthsShaved: shaved,
+      };
+    });
+
+  const topThree = categoryOptions.slice(0, 3);
+  const totalTopCut = topThree.reduce((s, o) => s + o.reasonableMonthlyCut, 0);
+  const topThreeNewEta = etaMonths(remainingAmount, currentMonthlyContribution + totalTopCut);
+  const topThreeCombined: CombinedAccelerationScenario = {
+    categories: topThree.map((o) => o.category),
+    totalMonthlyCut: roundMoney(totalTopCut),
+    newEtaMonths: topThreeNewEta,
+    monthsShaved: monthsShavedBetween(currentEtaMonths, topThreeNewEta),
+  };
+
+  const easiestSingle = categoryOptions[0] ?? null;
+
+  return {
+    currentEtaMonths,
+    currentMonthlyContribution: roundMoney(currentMonthlyContribution),
+    remainingAmount: roundMoney(remainingAmount),
+    categoryOptions,
+    topThreeCombined,
+    easiestSingle,
+  };
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_CATEGORY_CUT_RATIO;
+  return Math.max(0, Math.min(1, value));
+}
+
+function etaMonths(remaining: number, monthlyContribution: number): number {
+  if (remaining <= 0) return 0;
+  if (monthlyContribution <= 0) return Number.POSITIVE_INFINITY;
+  return Math.ceil(remaining / monthlyContribution);
+}
+
+function monthsShavedBetween(beforeEta: number, afterEta: number): number {
+  if (!Number.isFinite(beforeEta) && Number.isFinite(afterEta)) {
+    // "hedefe hiç ulaşılmıyorken" → "X ayda ulaşır" pratik anlam: Infinity shave
+    return Number.POSITIVE_INFINITY;
+  }
+  if (!Number.isFinite(beforeEta) || !Number.isFinite(afterEta)) return 0;
+  return Math.max(0, beforeEta - afterEta);
 }
