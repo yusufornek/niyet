@@ -126,6 +126,9 @@ model User {
   consentVersion    String?
   /// Maaş günü (ayın 1-31. günü). Null ise PAYDAY kuralları tetiklenmez.
   payday            Int?
+  /// Nefes Ayı — bu tarihe kadar otomatik katkı kuralları atlanır.
+  /// Null veya geçmiş tarih: aktif. Gelecek tarih: paused.
+  pausedUntil       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

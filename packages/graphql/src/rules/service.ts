@@ -1,3 +1,4 @@
+import { isUserPaused } from '@niyet/core';
 import type { PrismaClient, Prisma, Rule } from '@prisma/client';
 
 export type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'PAYDAY' | 'ONE_TIME';
@@ -30,6 +31,8 @@ export interface PaydayBatchResult {
   usersChecked: number;
   triggered: number;
   skippedAlreadyTriggered: number;
+  /** Kullanıcı Nefes Ayı'nda olduğu için atlanan rule sayısı */
+  skippedPaused: number;
   errors: Array<{ ruleId: string; userId: string; error: string }>;
 }
 
@@ -132,12 +135,19 @@ export class RulesService {
       usersChecked: users.length,
       triggered: 0,
       skippedAlreadyTriggered: 0,
+      skippedPaused: 0,
       errors: [],
     };
 
     const { start: dayStart, end: dayEnd } = boundsOfDay(date);
 
     for (const user of users) {
+      // Nefes Ayı kontrolü — kullanıcı paused ise tüm rule'larını atla.
+      // Aynı user için birden çok rule varsa hepsi skippedPaused'a sayılır.
+      if (isUserPaused(user.pausedUntil, date)) {
+        result.skippedPaused += user.rules.length;
+        continue;
+      }
       for (const rule of user.rules) {
         const already = await this.prisma.microContribution.findFirst({
           where: {
