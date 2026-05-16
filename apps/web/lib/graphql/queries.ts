@@ -130,12 +130,21 @@ export interface SendMessageResponse {
   stubMode: boolean;
 }
 
+export interface PauseStatus {
+  isPaused: boolean;
+  pausedUntil: string | null;
+  remainingDays: number | null;
+  summary: string;
+}
+
 export interface Me {
   id: string;
   email: string;
   name: string;
   age: number;
   monthlyIncome: number;
+  pausedUntil?: string | null;
+  pauseStatus?: PauseStatus;
 }
 
 export interface CategoryBreakdownRow {
@@ -404,7 +413,13 @@ export interface FinanceNewsItem {
 // Query string'leri
 // ─────────────────────────────────────────────────────────────
 
-const ME_Q = `query Me { me { id email name age monthlyIncome } }`;
+const ME_Q = `query Me {
+  me {
+    id email name age monthlyIncome
+    pausedUntil
+    pauseStatus { isPaused pausedUntil remainingDays summary }
+  }
+}`;
 const DASHBOARD_Q = `query Dashboard {
   dashboard {
     totalSpentLast30d totalOpportunityLast30d txCountLast30d weeklySaved
@@ -1359,5 +1374,59 @@ export function useTriggerRule() {
       });
     },
     onError: (e: Error) => toast.error('Kural tetiklenemedi', { description: e.message }),
+  });
+}
+
+// ───────────────────────────────────────────────────────────
+// Pause (Nefes Ayı) — PBI: geçici katkı duraklatma
+// ───────────────────────────────────────────────────────────
+
+const PAUSE_M = `mutation PauseContributions($months: Int!) {
+  pauseContributions(months: $months) {
+    id pausedUntil
+    pauseStatus { isPaused pausedUntil remainingDays summary }
+  }
+}`;
+
+const RESUME_M = `mutation ResumeContributions {
+  resumeContributions {
+    id pausedUntil
+    pauseStatus { isPaused pausedUntil remainingDays summary }
+  }
+}`;
+
+export function usePauseContributions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (months: number) =>
+      gqlFetcher<
+        {
+          pauseContributions: { id: string; pausedUntil: string | null; pauseStatus: PauseStatus };
+        },
+        { months: number }
+      >(PAUSE_M, { months }),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      const status = data.pauseContributions.pauseStatus;
+      toast.success('Nefes Ayı başlatıldı', {
+        description: status.summary,
+      });
+    },
+    onError: (e: Error) => toast.error('Duraklatma başarısız', { description: e.message }),
+  });
+}
+
+export function useResumeContributions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      gqlFetcher<{ resumeContributions: { id: string; pausedUntil: string | null } }, undefined>(
+        RESUME_M,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success('Katkılar sürdürüldü');
+    },
+    onError: (e: Error) => toast.error('Sürdürme başarısız', { description: e.message }),
   });
 }

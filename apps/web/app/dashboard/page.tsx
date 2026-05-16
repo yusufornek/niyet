@@ -27,14 +27,14 @@ import {
   useMe,
   useSubscriptionSummary,
 } from '@/lib/graphql/queries';
-import { useApp } from '@/lib/stores/use-app';
 import { formatTRY } from '@/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const paused = useApp((s) => s.paused);
 
   const { data: me } = useMe();
+  const pauseStatus = me?.me?.pauseStatus;
+  const paused = pauseStatus?.isPaused ?? false;
   const { data: dash, isLoading: dashLoading } = useDashboard();
   const { data: goalsData } = useGoals();
   const { data: scoreData } = useFutureScoreInsights();
@@ -68,7 +68,12 @@ export default function DashboardPage() {
       {paused && (
         <div className="ny-card border-primary/30 mb-3 flex items-center gap-3">
           <Pause size={18} className="text-primary" />
-          <div className="flex-1 text-sm">Katkıların duraklatıldı.</div>
+          <div className="flex-1 text-sm">
+            <div className="font-semibold">Katkıların duraklatıldı</div>
+            {pauseStatus?.remainingDays != null && (
+              <div className="text-xs opacity-70">{pauseStatus.remainingDays} gün daha duraklı</div>
+            )}
+          </div>
           <Link href="/pause" className="text-primary text-sm font-semibold">
             Yönet
           </Link>
