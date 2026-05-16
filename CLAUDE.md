@@ -13,9 +13,11 @@ Niyet, Türk genç kullanıcılar (özellikle 18-35 yaş) için tasarlanmış **
 ## Çalışma Prensipleri
 
 ### Türkçe yanıt ver
+
 Tüm açıklamalar, commit mesajları açıklamaları, UI metinleri Türkçe. Kod identifier'ları (variable/function isimleri) İngilizce kalır.
 
 ### Yüksek mühendislik, pragmatic teslim
+
 **Mühendislik kalitesi en üst öncelik**. Bu projenin temelini sağlam atmak, ekibin tüm geliştirme sürecini hızlandırır. `ENGINEERING.md` dokümanı **canlı manifesto** — her PR ve tasarım kararı bu prensiplere göre değerlendirilir:
 
 - **Clean Architecture** + katman disiplini (UI → Application → Domain → Infrastructure)
@@ -32,6 +34,7 @@ Demo zamanı kısıtlı **ama** "çalışan kod" yeterli değil — "doğru çal
 Detay: [`ENGINEERING.md`](./ENGINEERING.md) (16 bölüm).
 
 ### "Gerçek banka yok" ama "gerçek AI var"
+
 - `BankConnection` modeli mock — adapter pattern ile ileride gerçeğe geçer
 - Gemini API çağrıları **gerçek** — function calling, retry, cache hepsi gerçek
 - Mock data jüri demosu için tutarlı ve gerçekçi olmalı
@@ -74,11 +77,13 @@ bun lint && bun type-check && bun test    # Pre-push gate manual
 ## Kod Konvansiyonları
 
 ### TypeScript
+
 - **Strict mode açık**, `any` kullanma (zorunluysa `unknown` + narrow et)
 - Type ve Interface: domain modelleri için `interface`, props/state için `type`
 - Zod ile runtime validation: `packages/core/src/types.ts` paylaşımlı schema'lar
 
 ### React / Next.js
+
 - **Server Components default** — `'use client'` sadece interactivity gerekirse
 - Form'lar: `react-hook-form` + Zod resolver
 - Data fetching:
@@ -87,12 +92,14 @@ bun lint && bun type-check && bun test    # Pre-push gate manual
 - Routing: file-based, **react-router-dom asla kullanma**
 
 ### Styling
+
 - Tailwind utility-first
 - shadcn/ui primitives `components/ui/`'da, **bunları manuel düzenleme** — yeniden generate et
 - Custom design token'lar `globals.css`'te HSL CSS değişkenleri olarak
 - Mobile-first responsive: `sm:`, `md:`, `lg:` prefix'leriyle expand
 
 ### Naming
+
 - Files: `kebab-case.tsx` for components, `camelCase.ts` for utilities
 - Components: `PascalCase`
 - Hooks: `useFooBar` (camelCase, `use` prefix)
@@ -100,6 +107,7 @@ bun lint && bun type-check && bun test    # Pre-push gate manual
 - Türkçe identifier kullanma (kod İngilizce kalır)
 
 ### GraphQL (Pothos)
+
 - Code-first: `packages/graphql/src/schema/`'da type tanımları
 - Her domain için ayrı dosya: `transaction.ts`, `goal.ts`, `circle.ts`
 - Mutation'lar Zod ile input validate eder
@@ -109,18 +117,19 @@ bun lint && bun type-check && bun test    # Pre-push gate manual
 
 ## "Buralara Dokunma" Listesi
 
-| Dosya/klasör | Neden |
-|---|---|
-| `apps/web/components/ui/*` | shadcn/ui generated — manuel düzenleme yerine `npx shadcn@latest add` ile re-generate |
-| `apps/web-legacy/*` | Eski Vite mockup, sadece referans. Yeni kod oraya yazma |
-| `packages/db/prisma/migrations/*` | Migration dosyaları immutable. Schema değişirse yeni migration üret |
-| `bun.lockb` | Bun lockfile — manuel düzenlenmez |
+| Dosya/klasör                      | Neden                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------- |
+| `apps/web/components/ui/*`        | shadcn/ui generated — manuel düzenleme yerine `npx shadcn@latest add` ile re-generate |
+| `apps/web-legacy/*`               | Eski Vite mockup, sadece referans. Yeni kod oraya yazma                               |
+| `packages/db/prisma/migrations/*` | Migration dosyaları immutable. Schema değişirse yeni migration üret                   |
+| `bun.lockb`                       | Bun lockfile — manuel düzenlenmez                                                     |
 
 ---
 
 ## Tipik Görev Yönergeleri
 
 ### "Yeni bir ekran ekle" istendiğinde
+
 1. `apps/web/app/(app)/<slug>/page.tsx` oluştur
 2. Var olan `apps/web-legacy/src/screens/` içinden ilgili screen kodunu referans al
 3. PhoneShell ile sar
@@ -129,18 +138,21 @@ bun lint && bun type-check && bun test    # Pre-push gate manual
 6. Türkçe metinler doğrudan JSX'te (i18n şimdilik yok)
 
 ### "Yeni bir DB tablo/field ekle" istendiğinde
+
 1. `packages/db/prisma/schema.prisma` düzenle
 2. `bun db:migrate` çalıştır (migration dosyası üretilir)
 3. Pothos schema'yı güncelle: `packages/graphql/src/schema/<entity>.ts`
 4. Gerekirse Zod type'larını paylaşımlı `packages/core/src/types.ts`'e ekle
 
 ### "Gemini'ye yeni bir analiz tipi ekle" istendiğinde
+
 1. `packages/ai/src/functions/` altında yeni function definition
 2. System prompt'u güncelle (`packages/ai/src/prompts/`)
 3. `runAnalysis` pipeline'ı function'ı handler map'e ekler
 4. Function call result'u DB'ye yaz (yeni `TransactionAnalysis` field veya yeni model)
 
 ### "UI'da yeni shadcn component ihtiyacı varsa"
+
 ```bash
 cd apps/web && bunx shadcn@latest add <component-name>
 ```
@@ -155,6 +167,7 @@ cd apps/web && bunx shadcn@latest add <component-name>
 - **GraphQL (Pothos)**: Type-safe code-first, ileride RN için aynı schema
 - **Gemini 2.5 Flash + Function Calling**: Maliyet/kalite optimum, structured output
 - **Feature-branch + Manuel merge**: Proje sahibi main'e ne girdiğini explicit onayla kontrol eder (Conventional Commits, squash-merge)
+- **Zorunlu**: Her yeni feature için yeni branch aç; bir branch'te birden fazla feature taşıma.
 - **Türkçe-only şimdilik**: Demo için pragmatic
 
 ---
@@ -171,6 +184,7 @@ cd apps/web && bunx shadcn@latest add <component-name>
 ## Gönderim/Demo Hazırlığı (Faz 8)
 
 Demo öncesi checklist:
+
 - [ ] Vercel production deploy yeşil
 - [ ] Custom domain (varsa)
 - [ ] Demo user (Ayşe) seed'lenmiş, login bypass çalışıyor
