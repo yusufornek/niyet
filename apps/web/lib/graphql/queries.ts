@@ -2014,3 +2014,188 @@ export function useEvaluateMyCategorySpendingAlerts() {
     onError: (e: Error) => toast.error('Değerlendirme başarısız', { description: e.message }),
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// Monthly Contribution Target — PBI: katki hedefine yaklaşma uyarısı
+// ─────────────────────────────────────────────────────────────
+
+export type MonthlyTargetLevel = 'BEHIND' | 'NEAR' | 'REACHED';
+
+export interface MonthlyContributionTarget {
+  id: string;
+  targetAmount: number;
+  warnThresholdPct: number;
+  active: boolean;
+  lastAlertedMonth: string | null;
+  lastAlertedLevel: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonthlyContributionEvaluation {
+  monthYear: string;
+  targetAmount: number;
+  contributedAmount: number;
+  remainingAmount: number;
+  utilizationPct: number;
+  warnThresholdPct: number;
+  level: MonthlyTargetLevel;
+}
+
+export interface MonthlyTargetOutcome {
+  targetId: string | null;
+  evaluation: MonthlyContributionEvaluation | null;
+  notificationCreated: boolean;
+  notificationId: string | null;
+  skippedReason: string | null;
+}
+
+const MY_MONTHLY_TARGET_Q = `query MyMonthlyContributionTarget {
+  myMonthlyContributionTarget {
+    id targetAmount warnThresholdPct active
+    lastAlertedMonth lastAlertedLevel createdAt updatedAt
+  }
+}`;
+
+const PREVIEW_MY_MONTHLY_TARGET_Q = `query PreviewMyMonthlyContributionTarget(
+  $targetAmount: Float!, $warnThresholdPct: Float, $monthYear: String
+) {
+  previewMyMonthlyContributionTarget(
+    targetAmount: $targetAmount, warnThresholdPct: $warnThresholdPct, monthYear: $monthYear
+  ) {
+    monthYear targetAmount contributedAmount remainingAmount
+    utilizationPct warnThresholdPct level
+  }
+}`;
+
+const UPSERT_MY_MONTHLY_TARGET_M = `mutation UpsertMyMonthlyContributionTarget(
+  $targetAmount: Float!, $warnThresholdPct: Float, $active: Boolean
+) {
+  upsertMyMonthlyContributionTarget(
+    targetAmount: $targetAmount, warnThresholdPct: $warnThresholdPct, active: $active
+  ) {
+    id targetAmount warnThresholdPct active
+  }
+}`;
+
+const DELETE_MY_MONTHLY_TARGET_M = `mutation DeleteMyMonthlyContributionTarget {
+  deleteMyMonthlyContributionTarget
+}`;
+
+const EVALUATE_MY_MONTHLY_TARGET_M = `mutation EvaluateMyMonthlyContributionTarget($monthYear: String) {
+  evaluateMyMonthlyContributionTarget(monthYear: $monthYear) {
+    targetId notificationCreated notificationId skippedReason
+    evaluation {
+      monthYear targetAmount contributedAmount remainingAmount
+      utilizationPct warnThresholdPct level
+    }
+  }
+}`;
+
+export function useMyMonthlyContributionTarget() {
+  return useQuery({
+    queryKey: ['my-monthly-contribution-target'],
+    queryFn: () =>
+      gqlFetcher<{ myMonthlyContributionTarget: MonthlyContributionTarget | null }, undefined>(
+        MY_MONTHLY_TARGET_Q,
+      ),
+    select: (d) => d.myMonthlyContributionTarget,
+  });
+}
+
+export function usePreviewMyMonthlyTarget(args: {
+  targetAmount: number;
+  warnThresholdPct?: number;
+  monthYear?: string;
+}) {
+  return useQuery({
+    queryKey: [
+      'preview-my-monthly-target',
+      args.targetAmount,
+      args.warnThresholdPct ?? 0.9,
+      args.monthYear ?? null,
+    ],
+    enabled: args.targetAmount > 0,
+    queryFn: () =>
+      gqlFetcher<
+        { previewMyMonthlyContributionTarget: MonthlyContributionEvaluation },
+        { targetAmount: number; warnThresholdPct?: number; monthYear?: string }
+      >(PREVIEW_MY_MONTHLY_TARGET_Q, {
+        targetAmount: args.targetAmount,
+        warnThresholdPct: args.warnThresholdPct,
+        monthYear: args.monthYear,
+      }),
+    select: (d) => d.previewMyMonthlyContributionTarget,
+  });
+}
+
+export function useUpsertMyMonthlyTarget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { targetAmount: number; warnThresholdPct?: number; active?: boolean }) =>
+      gqlFetcher<{ upsertMyMonthlyContributionTarget: MonthlyContributionTarget }, typeof vars>(
+        UPSERT_MY_MONTHLY_TARGET_M,
+        vars,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['my-monthly-contribution-target'] });
+      void qc.invalidateQueries({ queryKey: ['preview-my-monthly-target'] });
+      toast.success('Aylık katkı hedefi kaydedildi');
+    },
+    onError: (e: Error) => toast.error('Kaydedilemedi', { description: e.message }),
+  });
+}
+
+export function useDeleteMyMonthlyTarget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      gqlFetcher<{ deleteMyMonthlyContributionTarget: boolean }, undefined>(
+        DELETE_MY_MONTHLY_TARGET_M,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['my-monthly-contribution-target'] });
+      toast.success('Aylık hedef kaldırıldı');
+    },
+    onError: (e: Error) => toast.error('Silinemedi', { description: e.message }),
+  });
+}
+
+export function useEvaluateMyMonthlyTarget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars?: { monthYear?: string }) =>
+      gqlFetcher<
+        { evaluateMyMonthlyContributionTarget: MonthlyTargetOutcome },
+        { monthYear?: string }
+      >(EVALUATE_MY_MONTHLY_TARGET_M, vars ?? {}),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+      const o = data.evaluateMyMonthlyContributionTarget;
+      if (o.skippedReason === 'NO_TARGET') {
+        toast.info('Henüz aylık hedefin yok', {
+          description: 'Önce bir aylık katkı hedefi belirle.',
+        });
+        return;
+      }
+      if (o.notificationCreated && o.evaluation) {
+        if (o.evaluation.level === 'REACHED') {
+          toast.success('🎉 Aylık hedefe ulaştın!', {
+            description: `${o.evaluation.contributedAmount.toLocaleString('tr-TR')} ₺ biriktirdin (hedef ${o.evaluation.targetAmount.toLocaleString('tr-TR')} ₺).`,
+          });
+        } else {
+          toast.success('Hedefe yaklaşıyorsun', {
+            description: `${o.evaluation.contributedAmount.toLocaleString('tr-TR')} ₺ / ${o.evaluation.targetAmount.toLocaleString('tr-TR')} ₺ (%${Math.round(o.evaluation.utilizationPct * 100)}).`,
+          });
+        }
+      } else if (o.skippedReason === 'ALREADY_ALERTED_THIS_MONTH') {
+        toast.info('Bu ay zaten bilgilendirildin');
+      } else {
+        toast.info('Hedefe henüz uzaksın', {
+          description: 'Devam et — küçük katkılar bile birikiyor.',
+        });
+      }
+    },
+    onError: (e: Error) => toast.error('Değerlendirme başarısız', { description: e.message }),
+  });
+}
