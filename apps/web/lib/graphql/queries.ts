@@ -189,6 +189,12 @@ export interface GoalCheckpoint {
   reachedAt: string | null;
 }
 
+export interface ContributionTimelinePoint {
+  periodStart: string; // YYYY-MM-01
+  periodAmount: number;
+  cumulativeAmount: number;
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -216,6 +222,7 @@ export interface Goal {
   planGeneratedAt?: string | null;
   trackedProgress?: number;
   trackedRemainingAmount?: number;
+  contributionTimeline?: ContributionTimelinePoint[];
 }
 
 export interface ProductQueryNormalization {
@@ -504,6 +511,7 @@ const GOAL_Q = `query Goal($id: ID!) {
     productImage productSource currency lastCheckedAt nextPriceCheckAt
     trackedProgress trackedRemainingAmount
     checkpoints { id percent label reached reachedAt }
+    contributionTimeline { periodStart periodAmount cumulativeAmount }
   }
 }`;
 const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {

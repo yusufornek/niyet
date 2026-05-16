@@ -3,6 +3,7 @@
 import { AlertTriangle, Check, RefreshCw, Sparkles } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 
+import { GoalProgressTimeline } from '@/components/goal-progress-timeline';
 import { PhoneShell } from '@/components/phone-shell';
 import {
   useGoal,
@@ -121,6 +122,11 @@ export default function GoalDetailPage() {
           <span>Tahmini: {etaLabel}</span>
         </div>
       </div>
+
+      <GoalProgressTimeline
+        timeline={goal.contributionTimeline ?? []}
+        targetAmount={currentPrice}
+      />
 
       {goal.planSummary && (
         <div className="ny-card mb-4">
