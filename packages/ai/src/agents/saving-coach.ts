@@ -10,6 +10,7 @@
  *   6. Caller mesajları DB'ye persist eder (ChatMessage)
  */
 import { prisma, type SpendingCategory } from '@niyet/db';
+import { calculateGoalAcceleration } from '@niyet/core';
 import { type Content, type FunctionCall, type GenerateContentResponse } from '@google/genai';
 
 import { GEMINI_MODEL, getGeminiClient } from '../client';
@@ -148,6 +149,89 @@ async function executeTool(
       }));
     }
 
+    case 'simulate_goal_acceleration': {
+      const goalId = typeof args.goal_id === 'string' ? args.goal_id : '';
+      if (!goalId) {
+        return { error: "goal_id parametresi zorunlu. Önce 'get_goals_with_eta' ile listele." };
+      }
+      const goal = await prisma.goal.findFirst({
+        where: { id: goalId, userId },
+        select: {
+          id: true,
+          name: true,
+          current: true,
+          currentPrice: true,
+          monthlyContribution: true,
+          targetDate: true,
+        },
+      });
+      if (!goal) {
+        return { error: 'Hedef bulunamadı veya erişim reddedildi.' };
+      }
+      // Son 30 gün opportunity'sini kategori bazında topla
+      const since30 = new Date();
+      since30.setDate(since30.getDate() - 30);
+      const txs = await prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: since30 } },
+        select: { category: true, opportunity: true },
+      });
+      const oppMap = new Map<SpendingCategory, number>();
+      for (const t of txs) {
+        if (t.opportunity != null) {
+          const v = Number(t.opportunity);
+          if (v > 0) {
+            oppMap.set(t.category, (oppMap.get(t.category) ?? 0) + v);
+          }
+        }
+      }
+      const categoryOpportunities = Array.from(oppMap.entries()).map(
+        ([category, monthlyOpportunity]) => ({ category, monthlyOpportunity }),
+      );
+
+      const remainingAmount = Math.max(0, Number(goal.currentPrice) - Number(goal.current));
+      const plan = calculateGoalAcceleration({
+        remainingAmount,
+        currentMonthlyContribution: Number(goal.monthlyContribution),
+        categoryOpportunities,
+      });
+      // Infinity → null (Gemini için JSON-friendly)
+      const finiteOrNull = (n: number) => (Number.isFinite(n) ? n : null);
+      return {
+        goal: {
+          id: goal.id,
+          name: goal.name,
+          remainingAmount: Math.round(remainingAmount),
+          monthlyContribution: Math.round(Number(goal.monthlyContribution)),
+          targetDate: goal.targetDate.toISOString().slice(0, 10),
+        },
+        plan: {
+          currentEtaMonths: finiteOrNull(plan.currentEtaMonths),
+          categoryOptions: plan.categoryOptions.map((o) => ({
+            category: o.category,
+            monthlyOpportunity: o.monthlyOpportunity,
+            reasonableMonthlyCut: o.reasonableMonthlyCut,
+            newEtaMonths: finiteOrNull(o.newEtaMonths),
+            monthsShaved: finiteOrNull(o.monthsShaved),
+          })),
+          topThreeCombined: {
+            categories: plan.topThreeCombined.categories,
+            totalMonthlyCut: plan.topThreeCombined.totalMonthlyCut,
+            newEtaMonths: finiteOrNull(plan.topThreeCombined.newEtaMonths),
+            monthsShaved: finiteOrNull(plan.topThreeCombined.monthsShaved),
+          },
+          easiestSingle: plan.easiestSingle
+            ? {
+                category: plan.easiestSingle.category,
+                monthlyOpportunity: plan.easiestSingle.monthlyOpportunity,
+                reasonableMonthlyCut: plan.easiestSingle.reasonableMonthlyCut,
+                newEtaMonths: finiteOrNull(plan.easiestSingle.newEtaMonths),
+                monthsShaved: finiteOrNull(plan.easiestSingle.monthsShaved),
+              }
+            : null,
+        },
+      };
+    }
+
     case 'recommend_action': {
       // Sadece UI'a iletilen bir signal; backend hiçbir yan etki yapmaz
       return { acknowledged: true };
@@ -231,6 +315,8 @@ export async function runSavingCoach(input: {
   userMessage: string;
   history: ChatHistoryItem[];
   goalContext?: string | null;
+  /// Goal sayfasından gelinmişse hedef id'si — `simulate_goal_acceleration` tool'una iletilir.
+  goalId?: string | null;
 }): Promise<CoachResult> {
   const client = getGeminiClient();
   if (!client) return stubCoachReply(input.userMessage);
@@ -238,11 +324,14 @@ export async function runSavingCoach(input: {
   // History → Gemini Content[] formatı
   const contents: Content[] = [];
   if (input.goalContext) {
+    const goalNote = input.goalId
+      ? `(System note: kullanıcı şu hedef için sohbet ediyor: "${input.goalContext}". ` +
+        `Hedef id: "${input.goalId}". Hedefe daha hızlı ulaşma sorulduğunda ` +
+        `\`simulate_goal_acceleration\` tool'unu bu id ile çağır.)`
+      : `(System note: kullanıcı şu hedef için sohbet ediyor: "${input.goalContext}")`;
     contents.push({
       role: 'user',
-      parts: [
-        { text: `(System note: kullanıcı şu hedef için sohbet ediyor: "${input.goalContext}")` },
-      ],
+      parts: [{ text: goalNote }],
     });
     contents.push({
       role: 'model',

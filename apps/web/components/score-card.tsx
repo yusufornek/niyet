@@ -35,6 +35,8 @@ export function ScoreCard({
   const c = 2 * Math.PI * r;
   const dash = (score / 100) * c;
 
+  const deltaSign = delta > 0 ? '+' : '';
+
   return (
     <div className={`score-stage ${open ? 'is-open' : ''}`}>
       <div className="score-cardm">
@@ -80,7 +82,8 @@ export function ScoreCard({
           </div>
 
           <span className="score-delta">
-            <TrendingUp size={12} /> +{delta} bu hafta
+            <TrendingUp size={12} /> {deltaSign}
+            {delta} bu hafta
           </span>
           <span className="score-cta">Detayı gör →</span>
         </div>

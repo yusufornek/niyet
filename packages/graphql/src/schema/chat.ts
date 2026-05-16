@@ -113,6 +113,9 @@ builder.mutationField('sendChatMessage', (t) =>
       message: t.arg.string({ required: true }),
       sessionId: t.arg.id({ required: false }),
       goalContext: t.arg.string({ required: false }),
+      /// Hedef bağlamı id'si — `simulate_goal_acceleration` tool'una iletilir.
+      /// Persist edilmez (DB'de tutulmaz), runtime'da agent'a aktarılır.
+      goalId: t.arg.id({ required: false }),
     },
     resolve: async (_root, args, ctx) => {
       const userId = ctx.userId!;
@@ -164,6 +167,7 @@ builder.mutationField('sendChatMessage', (t) =>
         userMessage: message,
         history,
         goalContext: session.goalContext,
+        goalId: args.goalId != null ? String(args.goalId) : null,
       });
 
       // 5. Tool call'ları DB'ye yaz (transparency için)

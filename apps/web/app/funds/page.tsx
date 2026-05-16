@@ -2,12 +2,26 @@
 
 import { Info } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
 import { type RiskProfile, useFundRecommendations, useGoals } from '@/lib/graphql/queries';
 
 export default function FundsPage() {
+  return (
+    <Suspense
+      fallback={
+        <PhoneShell title="Fon Önerileri">
+          <div className="ny-card h-32 animate-pulse" />
+        </PhoneShell>
+      }
+    >
+      <FundsPageInner />
+    </Suspense>
+  );
+}
+
+function FundsPageInner() {
   const searchParams = useSearchParams();
   const goalId = searchParams.get('goalId') ?? undefined;
 

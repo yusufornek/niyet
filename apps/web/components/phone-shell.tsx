@@ -32,6 +32,7 @@ export function PhoneShell({
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const isLearnMode = pathname?.startsWith('/learn') ?? false;
 
   return (
     <div className="flex h-[100dvh] items-stretch justify-center bg-[hsl(var(--canvas-parchment))] sm:h-auto sm:min-h-screen sm:items-start sm:py-8">
@@ -85,9 +86,11 @@ export function PhoneShell({
           <nav
             className={cn(
               'absolute bottom-0 left-0 right-0 flex items-center justify-around px-4 py-3',
-              dark
-                ? 'border-t border-white/10 bg-black/40 backdrop-blur-xl'
-                : 'border-t border-[hsl(var(--hairline))] bg-white/80 backdrop-blur-xl',
+              isLearnMode
+                ? 'border-t-2 border-[#E5E5E5] bg-[#F7F7F7]'
+                : dark
+                  ? 'border-t border-white/10 bg-black/40 backdrop-blur-xl'
+                  : 'border-t border-[hsl(var(--hairline))] bg-white/80 backdrop-blur-xl',
             )}
           >
             <TabBtn
@@ -95,30 +98,35 @@ export function PhoneShell({
               label="Ana"
               href="/dashboard"
               active={pathname === '/dashboard'}
+              duo={isLearnMode}
             />
             <TabBtn
               icon={<BarChart3 size={20} />}
               label="Radar"
               href="/radar"
               active={pathname === '/radar'}
+              duo={isLearnMode}
             />
             <TabBtn
               icon={<Target size={20} />}
               label="Hedefler"
               href="/goals"
               active={pathname?.startsWith('/goals') ?? false}
+              duo={isLearnMode}
             />
             <TabBtn
               icon={<MessageCircle size={20} />}
               label="Asistan"
               href="/chatbot"
               active={pathname === '/chatbot'}
+              duo={isLearnMode}
             />
             <TabBtn
               icon={<Bell size={20} />}
               label="Bildirim"
               href="/notifications"
               active={pathname === '/notifications'}
+              duo={isLearnMode}
             />
           </nav>
         )}
@@ -132,16 +140,42 @@ function TabBtn({
   label,
   href,
   active,
+  duo,
 }: {
   icon: ReactNode;
   label: string;
   href: string;
   active: boolean;
+  duo?: boolean;
 }) {
   return (
     <Link href={href} className="flex flex-col items-center gap-1 px-2">
-      <span className={active ? 'text-primary' : 'opacity-60'}>{icon}</span>
-      <span className={cn('text-[10px]', active ? 'text-primary font-semibold' : 'opacity-60')}>
+      <span
+        className={cn(
+          'flex h-8 w-8 items-center justify-center rounded-xl',
+          duo
+            ? active
+              ? 'bg-[#DFF7CC] text-[#58CC02]'
+              : 'text-[#A0A0A0]'
+            : active
+              ? 'text-primary'
+              : 'opacity-60',
+        )}
+      >
+        {icon}
+      </span>
+      <span
+        className={cn(
+          'text-[10px]',
+          duo
+            ? active
+              ? 'font-extrabold text-[#58CC02]'
+              : 'font-bold text-[#9A9A9A]'
+            : active
+              ? 'text-primary font-semibold'
+              : 'opacity-60',
+        )}
+      >
         {label}
       </span>
     </Link>

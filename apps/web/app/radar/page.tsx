@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { CategoryAutoSaveWidget } from '@/components/category-auto-save-widget';
 import { PhoneShell } from '@/components/phone-shell';
 import {
   useAcceptCategoryContribution,
@@ -199,6 +200,8 @@ export default function RadarPage() {
               />
             </div>
           </div>
+
+          <CategoryAutoSaveWidget />
 
           <div className="ny-eyebrow mb-2">Kategoriler</div>
           <div className="space-y-2">

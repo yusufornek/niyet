@@ -10,6 +10,7 @@ import {
   type ProductSearchResult,
   useCreateGoal,
   useGoals,
+  useLatestInflationRate,
   useNormalizeGoalProductQuery,
   useSearchGoalProducts,
 } from '@/lib/graphql/queries';
@@ -18,6 +19,7 @@ import { formatTRY } from '@/lib/utils';
 export default function GoalsPage() {
   const router = useRouter();
   const { data, isLoading } = useGoals();
+  const { data: inflationData } = useLatestInflationRate();
   const createGoal = useCreateGoal();
   const normalizeQuery = useNormalizeGoalProductQuery();
   const searchProducts = useSearchGoalProducts();
@@ -32,6 +34,7 @@ export default function GoalsPage() {
   const [selectedProduct, setSelectedProduct] = useState<ProductSearchResult | null>(null);
 
   const goals = data?.goals ?? [];
+  const tuikInflation = inflationData?.latestInflationRate ?? null;
 
   const handleSearch = async () => {
     const query = rawQuery.trim();
@@ -61,7 +64,7 @@ export default function GoalsPage() {
       name,
       basePrice: target,
       targetDate,
-      inflationPct: 28,
+      inflationPct: tuikInflation?.annualRate,
       monthlyContribution: Math.max(250, Math.round(target / 120)),
       tracking:
         selectedProduct && normalizedQuery

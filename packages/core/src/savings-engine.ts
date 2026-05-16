@@ -87,3 +87,82 @@ export function annualProjection(monthlyOpportunity: number, inflationPct = 0): 
   const r = inflationPct / 100 / 12;
   return monthlyOpportunity * ((Math.pow(1 + r, 12) - 1) / r);
 }
+
+export interface SavingsHorizonPoint {
+  /** Yıl sayısı (örn 5, 10, 30) */
+  years: number;
+  /** O yıl sonu birikim tutarı (TL) */
+  totalAmount: number;
+  /** Bu yıllar boyunca yatırılan toplam (anapara) */
+  totalContributed: number;
+  /** Bileşik getiri (totalAmount - totalContributed) */
+  growth: number;
+}
+
+export interface SavingsProjection {
+  /** Bugün tasarruf edilen tutar (kullanıcının kabul ettiği opportunity, TL) */
+  todayAmount: number;
+  /** Aylık tasarruf tahmini (todayAmount × 30) */
+  monthlyAmount: number;
+  /** Yıllık tasarruf tahmini (monthlyAmount × 12) */
+  yearlyAmount: number;
+  /** Compound projeksiyon noktaları (default: 5, 10, 30 yıl) */
+  horizon: SavingsHorizonPoint[];
+  /** Hesapta kullanılan yıllık nominal getiri oranı (%) */
+  annualReturnPct: number;
+}
+
+/**
+ * Bugünkü küçük tasarrufun aylık → yıllık → uzun vadeli emeklilik birikimine etkisini hesapla.
+ *
+ * Formula: Future Value of Annuity (her ay sabit PMT yatırılır, bileşik getiri ile büyür)
+ *   FV = PMT × ((1 + r)^n − 1) / r
+ *   PMT = aylık katkı, r = aylık nominal getiri, n = ay sayısı
+ *
+ * r = 0 ise basitçe PMT × n döner (compound olmadan toplam).
+ *
+ * `todayAmount` bir günlük tasarrufu temsil eder; aylık projeksiyon × 30 ile büyütülür
+ * (kullanıcının bugünkü davranışı her gün tekrarlanırsa varsayımı).
+ */
+export function projectSavingsHorizon(input: {
+  /** Bugünkü tasarruf (kabul edilen opportunity, TL) */
+  todayAmount: number;
+  /** Yıllık nominal getiri oranı (% — Türkiye reel getiri için %5 makul default) */
+  annualReturnPct?: number;
+  /** Compound noktaları (yıl) — default [5, 10, 30] */
+  horizonYears?: number[];
+}): SavingsProjection {
+  const todayAmount = Math.max(0, input.todayAmount);
+  const annualReturnPct = input.annualReturnPct ?? 5;
+  const horizonYears = input.horizonYears ?? [5, 10, 30];
+
+  const monthlyAmount = todayAmount * 30;
+  const yearlyAmount = monthlyAmount * 12;
+  const monthlyReturn = annualReturnPct / 100 / 12;
+
+  const horizon: SavingsHorizonPoint[] = horizonYears.map((years) => {
+    const months = years * 12;
+    const totalContributed = monthlyAmount * months;
+    let totalAmount: number;
+    if (monthlyReturn === 0) {
+      totalAmount = totalContributed;
+    } else {
+      // FV of annuity formula
+      totalAmount = monthlyAmount * ((Math.pow(1 + monthlyReturn, months) - 1) / monthlyReturn);
+    }
+    return {
+      years,
+      totalAmount: Math.round(totalAmount),
+      totalContributed: Math.round(totalContributed),
+      growth: Math.round(totalAmount - totalContributed),
+    };
+  });
+
+  return {
+    todayAmount: Math.round(todayAmount),
+    monthlyAmount: Math.round(monthlyAmount),
+    yearlyAmount: Math.round(yearlyAmount),
+    horizon,
+    annualReturnPct,
+  };
+}

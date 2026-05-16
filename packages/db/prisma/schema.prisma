@@ -79,6 +79,9 @@ enum CircleType {
 enum NotificationType {
   SPENDING_ALERT
   GOAL_MILESTONE
+  GOAL_PRICE_ALERT
+  LEARN_UPDATE
+  FINANCE_NEWS_IMPORTANT
   AI_INSIGHT
   ANALYSIS_COMPLETE
   RULE_TRIGGERED
@@ -112,42 +115,78 @@ enum ContributionStatus {
 // ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
+  id                String    @id @default(cuid())
   /// Supabase Auth user id (auth.users.id ile aynı). RLS policies bunu kullanır.
-  authId        String?  @unique
-  email         String   @unique
-  name          String
-  age           Int
-  monthlyIncome Decimal  @db.Money
+  authId            String?   @unique
+  email             String    @unique
+  name              String
+  age               Int
+  monthlyIncome     Decimal   @db.Money
   consentAcceptedAt DateTime?
   consentVersion    String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  /// Maaş günü (ayın 1-31. günü). Null ise PAYDAY kuralları tetiklenmez.
+  payday            Int?
+  /// Nefes Ayı — bu tarihe kadar otomatik katkı kuralları atlanır.
+  /// Null veya geçmiş tarih: aktif. Gelecek tarih: paused.
+  pausedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  accounts            Account[]
-  bankConnections     BankConnection[]
-  transactions        Transaction[]
-  subscriptions       Subscription[]
-  goals               Goal[]
-  rules               Rule[]
-  circleMemberships   CircleMembership[]
-  notifications       Notification[]
-  futureScores        FutureScoreSnapshot[]
-  analysisRuns        AnalysisRun[]
-  microContributions  MicroContribution[]
-  chatSessions        ChatSession[]
+  accounts           Account[]
+  bankConnections    BankConnection[]
+  transactions       Transaction[]
+  subscriptions      Subscription[]
+  goals              Goal[]
+  rules              Rule[]
+  circleMemberships  CircleMembership[]
+  notifications      Notification[]
+  learnState         UserLearnState?
+  learnProgress      UserLearnProgress[]
+  futureScores       FutureScoreSnapshot[]
+  badges             UserBadge[]
+  analysisRuns       AnalysisRun[]
+  microContributions MicroContribution[]
+  chatSessions       ChatSession[]
+  categoryAutoSaveRules CategoryAutoSaveRule[]
 
   @@index([authId])
 }
 
+/// Kullanici "kahve", "yemek siparisi" gibi belirli kategoriler icin
+/// "ortalama-altinda harcadigimda farki otomatik tasarrufa donustur"
+/// tercihi tanimlar. Her ay maksimum 1 kez tetiklenir; idempotency
+/// MicroContribution.sourceRef ile saglanir.
+model CategoryAutoSaveRule {
+  id             String           @id @default(cuid())
+  userId         String
+  category       SpendingCategory
+  /// Kac aylik gecmis ortalama alinacak (default 3).
+  lookbackMonths Int              @default(3)
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  /// Bilgi amacli — son tetikleme zamani (denetim / debug icin).
+  lastTriggeredAt DateTime?
+  /// "YYYY-MM" — en son hangi ay icin tetiklendi (kullaniciya gosterim icin).
+  lastTriggeredMonth String?
+  /// En son tetiklemede aktarilan tutar (TL).
+  lastTransferAmount Decimal?     @db.Money
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Bir kullanici ayni kategoride yalnizca bir kez tanimlayabilir.
+  @@unique([userId, category])
+  @@index([userId, active])
+}
+
 model BankConnection {
-  id          String   @id @default(cuid())
-  userId      String
+  id             String    @id @default(cuid())
+  userId         String
   /// "Garanti BBVA", "İş Bankası", "Akbank", "Yapı Kredi", "Ziraat"
-  bankName    String
-  connectedAt DateTime @default(now())
+  bankName       String
+  connectedAt    DateTime  @default(now())
   disconnectedAt DateTime?
-  active      Boolean  @default(true)
+  active         Boolean   @default(true)
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accounts Account[]
@@ -156,18 +195,18 @@ model BankConnection {
 }
 
 model Account {
-  id          String      @id @default(cuid())
-  userId      String
-  bankConnId  String
-  type        AccountType
+  id         String      @id @default(cuid())
+  userId     String
+  bankConnId String
+  type       AccountType
   /// Son 4 rakam (gerçek kart no asla saklanmaz)
-  last4       String
+  last4      String
   /// Hesap takma adı: "Maaş hesabı", "Birikim", vs.
-  nickname    String?
-  balance     Decimal     @db.Money
+  nickname   String?
+  balance    Decimal     @db.Money
 
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bankConn     BankConnection   @relation(fields: [bankConnId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankConn     BankConnection @relation(fields: [bankConnId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 
   @@index([userId])
@@ -195,12 +234,12 @@ model Transaction {
   rawData        Json?
 
   /// Kullanıcı bu transaction'ın fırsatını mikro katkıya dönüştürdüyse buradadır
-  acceptedContributionId String?           @unique
+  acceptedContributionId String? @unique
 
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account             Account               @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  transactionAnalyses TransactionAnalysis[]
-  acceptedContribution MicroContribution?   @relation(fields: [acceptedContributionId], references: [id], onDelete: SetNull)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account               @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactionAnalyses  TransactionAnalysis[]
+  acceptedContribution MicroContribution?    @relation(fields: [acceptedContributionId], references: [id], onDelete: SetNull)
 
   @@index([userId, occurredAt])
   @@index([userId, category])
@@ -208,14 +247,14 @@ model Transaction {
 }
 
 model Subscription {
-  id            String              @id @default(cuid())
-  userId        String
-  name          String
-  amount        Decimal             @db.Money
-  frequency     RuleFrequency
-  status        SubscriptionStatus  @default(ACTIVE)
-  detectedAt    DateTime            @default(now())
-  lastChargedAt DateTime?
+  id              String             @id @default(cuid())
+  userId          String
+  name            String
+  amount          Decimal            @db.Money
+  frequency       RuleFrequency
+  status          SubscriptionStatus @default(ACTIVE)
+  detectedAt      DateTime           @default(now())
+  lastChargedAt   DateTime?
   /// İlişkili merchant pattern (kullanıcı 'Netflix' tx'lerini takip etmek için)
   merchantPattern String?
 
@@ -253,7 +292,7 @@ model AnalysisRun {
 }
 
 model TransactionAnalysis {
-  id            String           @id @default(cuid())
+  id            String @id @default(cuid())
   runId         String
   transactionId String
 
@@ -275,35 +314,40 @@ model TransactionAnalysis {
 // ─────────────────────────────────────────────────────────────
 
 model Goal {
-  id                  String     @id @default(cuid())
-  userId              String
+  id                     String     @id @default(cuid())
+  userId                 String
   /// "Yeni laptop", "Ev peşinatı", "Emeklilik birikimi"
-  name                String
-  basePrice           Decimal    @db.Money
-  currentPrice        Decimal    @db.Money
-  inflationPct        Decimal    @db.Decimal(5, 2)
-  targetDate          DateTime
-  current             Decimal    @default(0) @db.Money
-  monthlyContribution Decimal    @db.Money
-  status              GoalStatus @default(ACTIVE)
+  name                   String
+  basePrice              Decimal    @db.Money
+  currentPrice           Decimal    @db.Money
+  inflationPct           Decimal    @db.Decimal(5, 2)
+  targetDate             DateTime
+  current                Decimal    @default(0) @db.Money
+  monthlyContribution    Decimal    @db.Money
+  status                 GoalStatus @default(ACTIVE)
   /// [{ date, price }] formatında price tracking
-  priceHistory        Json?
+  priceHistory           Json?
   /// Goal tracking ürün sorgusunun ham hali
-  rawQuery            String?
+  rawQuery               String?
   /// Goal tracking normalize edilmiş ürün sorgusu
-  normalizedQuery     String?
-  category            String?
-  selectedProductTitle String?
-  productUrl          String?
-  productImage        String?
-  productSource       String?
-  currency            String     @default("TRY")
-  lastCheckedAt       DateTime?
+  normalizedQuery        String?
+  category               String?
+  selectedProductTitle   String?
+  productUrl             String?
+  productImage           String?
+  productSource          String?
+  currency               String     @default("TRY")
+  lastCheckedAt          DateTime?
+  nextPriceCheckAt       DateTime?
+  priceCheckFailureCount Int        @default(0)
+  priceCheckPausedUntil  DateTime?
   /// Goal Forecasting Agent (Pattern C) için context
-  coachContext        String?
-  autoUpdate          Boolean    @default(true)
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  coachContext           String?
+  planSummary            String?
+  planGeneratedAt        DateTime?
+  autoUpdate             Boolean    @default(true)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   checkpoints        GoalCheckpoint[]
@@ -407,6 +451,153 @@ model CircleMembership {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Learn (Egitim + Oyunlastirma)
+// ─────────────────────────────────────────────────────────────
+
+enum LearnSourceType {
+  EGM_PAGE
+  EGM_PDF
+  TUIK_API
+}
+
+enum LearnPackStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model LearnDailyPack {
+  id           String         @id @default(cuid())
+  packDate     DateTime       @unique
+  status       LearnPackStatus @default(DRAFT)
+  sourceHash   String
+  summary      String
+  createdAt    DateTime       @default(now())
+  publishedAt  DateTime?
+
+  cards        LearnCard[]
+  facts        LearnFact[]
+  snapshots    LearnSourceSnapshot[]
+  progress     UserLearnProgress[]
+
+  @@index([status, packDate])
+}
+
+model LearnSourceSnapshot {
+  id            String          @id @default(cuid())
+  packId         String
+  sourceType     LearnSourceType
+  sourceUrl      String
+  sourceTitle    String
+  fetchedAt      DateTime        @default(now())
+  effectiveDate  DateTime?
+  contentHash    String
+  rawContent     String
+
+  pack LearnDailyPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, sourceType])
+  @@index([sourceUrl])
+}
+
+model LearnFact {
+  id            String   @id @default(cuid())
+  packId         String
+  key           String
+  label         String
+  valueText     String
+  valueNumber   Decimal? @db.Decimal(12, 4)
+  unit          String?
+  confidence    Decimal  @db.Decimal(5, 2)
+  sourceUrl     String
+  effectiveDate DateTime?
+  createdAt     DateTime @default(now())
+
+  pack LearnDailyPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, key])
+}
+
+model LearnCard {
+  id              String   @id @default(cuid())
+  packId           String
+  orderNo          Int
+  slug             String
+  title            String
+  shortDescription String
+  body             String
+  sourceName       String
+  sourceUrl        String
+  sourceUpdatedAt  DateTime?
+  createdAt        DateTime @default(now())
+
+  pack      LearnDailyPack      @relation(fields: [packId], references: [id], onDelete: Cascade)
+  quizItems LearnQuizItem[]
+  progress  UserLearnProgress[]
+
+  @@unique([packId, orderNo])
+  @@index([packId])
+}
+
+model LearnQuizItem {
+  id            String   @id @default(cuid())
+  cardId         String
+  question       String
+  optionsJson    Json
+  correctIndex   Int
+  explanation    String
+  explanationLlm String?
+  createdAt      DateTime @default(now())
+
+  card LearnCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+}
+
+model FinanceNewsItem {
+  id              String   @id @default(cuid())
+  title           String
+  summaryShort    String
+  sourceName      String
+  sourceUrl       String
+  publishedAt     DateTime
+  isImportant     Boolean  @default(false)
+  importanceScore Int      @default(0)
+  dedupeHash      String   @unique
+  createdAt       DateTime @default(now())
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([isImportant, publishedAt(sort: Desc)])
+}
+
+model UserLearnState {
+  userId          String   @id
+  totalXp         Int      @default(0)
+  level           Int      @default(1)
+  streakDays      Int      @default(0)
+  lastActiveDate  DateTime?
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserLearnProgress {
+  id              String   @id @default(cuid())
+  userId          String
+  packId          String
+  cardId          String
+  quizScore       Int      @default(0)
+  xpEarned        Int      @default(0)
+  completedAt     DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pack LearnDailyPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+  card LearnCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId, completedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
 // AI Chat Sessions (Pattern B — AI Saving Coach multi-turn agent)
 // ─────────────────────────────────────────────────────────────
 
@@ -435,18 +626,18 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id        String    @id @default(cuid())
-  sessionId String
-  role      ChatRole
+  id          String   @id @default(cuid())
+  sessionId   String
+  role        ChatRole
   /// USER: kullanıcı metni. ASSISTANT: Gemini cevabı. TOOL: function result.
-  content   String
+  content     String
   /// Function call yapıldıysa hangi tool (set_category, recommend_subscription_to_cancel, vs.)
-  toolName  String?
+  toolName    String?
   /// Tool arg veya result JSON
   toolPayload Json?
   /// Bu mesaj için Gemini'nin harcadığı token sayısı (ASSISTANT için)
-  tokensUsed Int?
-  createdAt DateTime  @default(now())
+  tokensUsed  Int?
+  createdAt   DateTime @default(now())
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -458,30 +649,30 @@ model ChatMessage {
 // ─────────────────────────────────────────────────────────────
 
 model MicroContribution {
-  id              String              @id @default(cuid())
-  userId          String
-  amount          Decimal             @db.Money
+  id          String             @id @default(cuid())
+  userId      String
+  amount      Decimal            @db.Money
   /// Hangi kategoriden geldiği (analitik için; null = MANUAL)
-  category        SpendingCategory?
-  source          ContributionSource
-  status          ContributionStatus  @default(PENDING)
+  category    SpendingCategory?
+  source      ContributionSource
+  status      ContributionStatus @default(PENDING)
   /// Polymorphic kaynak: REDUCIBLE_TRANSACTION -> Transaction.id; CATEGORY_BUCKET -> category enum;
   /// RULE_TRIGGERED -> Rule.id. MANUAL'da null.
-  sourceRef       String?
+  sourceRef   String?
   /// İlişkili goal (varsa; kullanıcı katkıyı belirli hedefe yönlendirdiyse)
-  goalId          String?
+  goalId      String?
   /// İlişkili rule (RULE_TRIGGERED için)
-  ruleId          String?
+  ruleId      String?
   /// Kullanıcı notu / etiket
-  note            String?
-  createdAt       DateTime            @default(now())
-  committedAt     DateTime?
-  reversedAt      DateTime?
+  note        String?
+  createdAt   DateTime           @default(now())
+  committedAt DateTime?
+  reversedAt  DateTime?
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transaction    Transaction?
-  goal           Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  rule           Rule?         @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  goal        Goal?        @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  rule        Rule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([userId, status])
@@ -506,6 +697,18 @@ model FutureScoreSnapshot {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, computedAt])
+}
+
+model UserBadge {
+  id         String   @id @default(cuid())
+  userId     String
+  badgeKey   String
+  unlockedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeKey])
+  @@index([userId, unlockedAt])
 }
 
 model Notification {

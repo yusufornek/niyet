@@ -14,6 +14,10 @@ import './notification';
 import './analysis';
 import './micro-contribution';
 import './chat';
+import './learn';
+import './finance-news';
+import './rule';
+import './category-auto-save';
 import './fund';
 
 import { builder } from '../builder';

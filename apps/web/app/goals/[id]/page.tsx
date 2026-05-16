@@ -1,23 +1,53 @@
 'use client';
 
-import { AlertTriangle, Check, RefreshCw, Sparkles } from 'lucide-react';
+import { simulateGoalContribution } from '@niyet/core';
+import { AlertTriangle, Check, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
+import { GoalProgressTimeline } from '@/components/goal-progress-timeline';
 import { PhoneShell } from '@/components/phone-shell';
 import {
+  type GoalPlanLevel,
   useGoal,
   useGoalPriceAlerts,
+  useLatestInflationRate,
   useMarkGoalPriceAlertRead,
   useRefreshGoalTrackedPrice,
   useUpdateGoal,
 } from '@/lib/graphql/queries';
 import { formatTRY } from '@/lib/utils';
 
+const LEVEL_STYLES: Record<
+  GoalPlanLevel,
+  { label: string; container: string; badge: string; icon: string }
+> = {
+  ON_TRACK: {
+    label: 'Plan gerçekçi',
+    container: 'border-emerald-300/60 bg-emerald-50/40',
+    badge: 'bg-emerald-100 text-emerald-800',
+    icon: '✓',
+  },
+  STRETCH: {
+    label: 'Plan sıkı',
+    container: 'border-amber-300/60 bg-amber-50/40',
+    badge: 'bg-amber-100 text-amber-800',
+    icon: '⚡',
+  },
+  AT_RISK: {
+    label: 'Plan riskli',
+    container: 'border-rose-300/60 bg-rose-50/40',
+    badge: 'bg-rose-100 text-rose-800',
+    icon: '⚠',
+  },
+};
+
 export default function GoalDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { data, isLoading } = useGoal(params.id);
   const { data: alertsData } = useGoalPriceAlerts(true);
+  const { data: inflationData } = useLatestInflationRate();
   const updateGoal = useUpdateGoal();
   const refreshPrice = useRefreshGoalTrackedPrice();
   const markAlertRead = useMarkGoalPriceAlertRead();
@@ -42,6 +72,8 @@ export default function GoalDetailPage() {
   const base = goal.basePrice;
   const currentPrice = goal.currentPrice;
   const inflation = goal.inflationPct;
+  const tuikInflation = inflationData?.latestInflationRate ?? null;
+  const effectiveInflation = tuikInflation?.annualRate ?? inflation;
   const monthly = goal.monthlyContribution;
   const history = goal.priceHistory ?? [
     { date: '', price: base },
@@ -69,20 +101,6 @@ export default function GoalDetailPage() {
       return `${x},${y}`;
     })
     .join(' ');
-
-  const scenarios = [
-    { label: 'Mevcut plan', monthly, eta: monthsToGoal },
-    {
-      label: '+%20 katkı',
-      monthly: Math.round(monthly * 1.2),
-      eta: Math.ceil(remaining / Math.max(1, monthly * 1.2)),
-    },
-    {
-      label: 'Hızlı (2x)',
-      monthly: monthly * 2,
-      eta: Math.ceil(remaining / Math.max(1, monthly * 2)),
-    },
-  ];
 
   return (
     <PhoneShell title={goal.name} back>
@@ -118,6 +136,67 @@ export default function GoalDetailPage() {
         </div>
       </div>
 
+      {goal.savingsPlan && (
+        <div className={`ny-card mb-4 border-2 ${LEVEL_STYLES[goal.savingsPlan.level].container}`}>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="ny-eyebrow flex items-center gap-1">
+              <Clock size={12} /> Plan gerçekçiliği
+            </div>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${LEVEL_STYLES[goal.savingsPlan.level].badge}`}
+            >
+              {LEVEL_STYLES[goal.savingsPlan.level].icon}{' '}
+              {LEVEL_STYLES[goal.savingsPlan.level].label.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="text-sm leading-relaxed">
+            {goal.savingsPlan.projectedMonthsToGoal == null ? (
+              <span>
+                Mevcut hızla bu hedefe ulaşılamıyor (aylık katkı yok). Bir kural ekleyerek
+                başlayabilirsin.
+              </span>
+            ) : (
+              <ProjectionMessage
+                projected={goal.savingsPlan.projectedMonthsToGoal}
+                target={goal.savingsPlan.targetMonthsRemaining}
+                etaLabel={etaLabel}
+              />
+            )}
+          </div>
+
+          {goal.savingsPlan.monthlyGap > 0 && (
+            <div className="mt-2 rounded-lg bg-white/60 px-2 py-1.5 text-xs">
+              Hedef tarihine yetişmek için ayda <b>{formatTRY(goal.savingsPlan.monthlyGap)}</b> daha
+              gerek. Şu an aylık <b>{formatTRY(goal.savingsPlan.suggestedMonthlyContribution)}</b>{' '}
+              öneri,
+              <b> {formatTRY(goal.savingsPlan.requiredMonthlyContribution)}</b> şart.
+            </div>
+          )}
+
+          {goal.savingsPlan.summary && (
+            <div className="mt-2 text-xs italic opacity-70">{goal.savingsPlan.summary}</div>
+          )}
+        </div>
+      )}
+
+      <GoalProgressTimeline
+        timeline={goal.contributionTimeline ?? []}
+        targetAmount={currentPrice}
+      />
+
+      {goal.planSummary && (
+        <div className="ny-card mb-4">
+          <div className="ny-eyebrow mb-2">Kişisel tasarruf planı</div>
+          <p className="text-sm leading-relaxed opacity-80">{goal.planSummary}</p>
+          {goal.planGeneratedAt && (
+            <div className="mt-2 text-xs opacity-50">
+              Plan tarihi: {new Date(goal.planGeneratedAt).toLocaleString('tr-TR')}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="ny-card mb-4">
         <div className="mb-2 flex items-center justify-between">
           <div>
@@ -126,6 +205,12 @@ export default function GoalDetailPage() {
             {goal.lastCheckedAt && (
               <div className="mt-1 text-xs opacity-60">
                 Son kontrol: {new Date(goal.lastCheckedAt).toLocaleString('tr-TR')}
+              </div>
+            )}
+            {goal.nextPriceCheckAt && (
+              <div className="mt-1 text-xs opacity-60">
+                Sonraki otomatik kontrol:{' '}
+                {new Date(goal.nextPriceCheckAt).toLocaleDateString('tr-TR')}
               </div>
             )}
           </div>
@@ -139,11 +224,17 @@ export default function GoalDetailPage() {
         <div className="mt-2 flex items-center justify-between">
           <div className="text-xs opacity-60">Fiyat geçmişi</div>
           <button
-            onClick={() => refreshPrice.mutate(goal.id)}
-            disabled={refreshPrice.isPending || !goal.normalizedQuery}
+            onClick={() => {
+              if (refreshPrice.isPending) return;
+              refreshPrice.mutate(goal.id);
+            }}
+            aria-disabled={refreshPrice.isPending}
             className="ny-chip"
           >
-            <RefreshCw size={14} className={`mr-1 inline ${refreshPrice.isPending ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              size={14}
+              className={`mr-1 inline ${refreshPrice.isPending ? 'animate-spin' : ''}`}
+            />
             Fiyatı yenile
           </button>
         </div>
@@ -159,7 +250,9 @@ export default function GoalDetailPage() {
                   <span className="font-semibold">
                     {alert.direction === 'INCREASE' ? 'Fiyat arttı' : 'Fiyat düştü'}
                   </span>
-                  <span className={alert.direction === 'INCREASE' ? 'text-amber-600' : 'text-primary'}>
+                  <span
+                    className={alert.direction === 'INCREASE' ? 'text-amber-600' : 'text-primary'}
+                  >
                     %{Math.round(Math.abs(alert.percentageChange) * 100)}
                   </span>
                 </div>
@@ -180,45 +273,39 @@ export default function GoalDetailPage() {
 
       <div className="ny-card mb-4">
         <div className="flex items-center justify-between">
-          <div className="ny-eyebrow">Beklenen yıllık enflasyon</div>
-          <div className="text-sm font-semibold">%{Math.round(inflation)}</div>
+          <div className="ny-eyebrow">TÜİK yıllık TÜFE</div>
+          <div className="text-sm font-semibold">%{effectiveInflation.toFixed(2)}</div>
         </div>
         <input
           type="range"
           min={0}
           max={80}
-          value={inflation}
-          onChange={(e) => updateGoal.mutate({ id: goal.id, input: { inflationPct: +e.target.value } })}
+          value={Math.round(effectiveInflation)}
+          onChange={(e) =>
+            updateGoal.mutate({ id: goal.id, input: { inflationPct: +e.target.value } })
+          }
+          disabled={!!tuikInflation}
           className="mt-3 w-full accent-[hsl(var(--primary))]"
         />
         <div className="mt-1 text-xs opacity-60">
-          Hedef değeri yıllık %{Math.round(inflation)} artışla yeniden hesaplanır.
+          {tuikInflation
+            ? `${tuikInflation.period} bülteni, aylık ${
+                tuikInflation.monthlyRate?.toFixed(2) ?? '-'
+              }%. Hedef değeri yıllık %${effectiveInflation.toFixed(2)} artışla yeniden hesaplanır.`
+            : `Hedef değeri yıllık %${Math.round(inflation)} artışla yeniden hesaplanır.`}
         </div>
       </div>
 
-      <div className="ny-card mb-4">
-        <div className="ny-eyebrow mb-3">Tasarruf senaryoları</div>
-        <div className="space-y-2">
-          {scenarios.map((s, i) => (
-            <button
-              key={s.label}
-              onClick={() => updateGoal.mutate({ id: goal.id, input: { monthlyContribution: s.monthly } })}
-              className={`flex w-full items-center justify-between rounded-xl border p-3 ${
-                s.monthly === monthly ? 'border-primary bg-primary/5' : 'border-[hsl(var(--hairline))]'
-              }`}
-            >
-              <div className="text-left">
-                <div className="text-sm font-semibold">{s.label}</div>
-                <div className="text-xs opacity-60">{formatTRY(s.monthly)} / ay</div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-semibold">{s.eta} ay</div>
-                <div className="text-xs opacity-60">{i === 0 ? 'tahmini' : `${monthsToGoal - s.eta} ay erken`}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+      <WhatIfSimulator
+        goalId={goal.id}
+        currentMonthly={monthly}
+        remainingAmount={remaining}
+        targetDate={new Date(goal.targetDate)}
+        onApply={(value) =>
+          updateGoal.mutate({ id: goal.id, input: { monthlyContribution: value } })
+        }
+        applyPending={updateGoal.isPending}
+      />
 
       <div className="ny-card mb-4">
         <div className="mb-3 flex items-center justify-between">
@@ -237,7 +324,11 @@ export default function GoalDetailPage() {
                     reached ? 'bg-primary text-white' : 'bg-[hsl(var(--divider-soft))]'
                   }`}
                 >
-                  {reached ? <Check size={14} /> : <span className="text-[10px] font-semibold">%{c.percent}</span>}
+                  {reached ? (
+                    <Check size={14} />
+                  ) : (
+                    <span className="text-[10px] font-semibold">%{c.percent}</span>
+                  )}
                 </div>
                 <div className="flex-1 text-sm">{c.label}</div>
                 <div className="text-xs opacity-60">{reached ? 'ulaşıldı' : 'bekliyor'}</div>
@@ -250,10 +341,14 @@ export default function GoalDetailPage() {
       <div className="ny-card mb-4 flex items-center justify-between">
         <div>
           <div className="text-sm font-semibold">Tasarruf planını otomatik güncelle</div>
-          <p className="mt-1 text-xs opacity-60">Fiyat değişince aylık katkın yeniden hesaplanır.</p>
+          <p className="mt-1 text-xs opacity-60">
+            Fiyat değişince aylık katkın yeniden hesaplanır.
+          </p>
         </div>
         <button
-          onClick={() => updateGoal.mutate({ id: goal.id, input: { autoUpdate: !goal.autoUpdate } })}
+          onClick={() =>
+            updateGoal.mutate({ id: goal.id, input: { autoUpdate: !goal.autoUpdate } })
+          }
           className={`relative h-7 w-12 rounded-full transition ${
             goal.autoUpdate ? 'bg-primary' : 'bg-[hsl(var(--divider-soft))]'
           }`}
@@ -277,5 +372,202 @@ export default function GoalDetailPage() {
         <Sparkles size={16} /> AI Tasarruf Koçu ile konuş
       </button>
     </PhoneShell>
+  );
+}
+
+/**
+ * Plan gerçekçilik banner'ında "mevcut hızla X ay, hedef tarihine Y ay var,
+ * Z ay erken/geç ulaşacaksın" mesajını render eder. Pure presentation.
+ */
+function ProjectionMessage({
+  projected,
+  target,
+  etaLabel,
+}: {
+  projected: number;
+  target: number;
+  etaLabel: string;
+}) {
+  const delta = projected - target;
+  return (
+    <span>
+      Mevcut hızla <b>{projected} ay</b> sürer ({etaLabel}). Hedef tarihine <b>{target} ay</b> var
+      {delta > 0 ? (
+        <>
+          {' '}
+          — <b className="text-rose-700">{delta} ay geç</b> ulaşacaksın.
+        </>
+      ) : delta < 0 ? (
+        <>
+          {' '}
+          — <b className="text-emerald-700">{Math.abs(delta)} ay erken</b> ulaşacaksın.
+        </>
+      ) : (
+        <>
+          {' '}
+          — <b className="text-emerald-700">tam zamanında</b> ulaşacaksın.
+        </>
+      )}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// What-If Simulator — slider + presets + uygula
+// PBI: "aylık katkımı artırırsam veya azaltırsam hedefime ne zaman ulaşırım"
+// ─────────────────────────────────────────────────────────────
+
+const LEVEL_LABELS = {
+  ON_TRACK: { label: 'Tam zamanında', tone: 'text-emerald-700 bg-emerald-100' },
+  STRETCH: { label: 'Sıkı plan', tone: 'text-amber-800 bg-amber-100' },
+  AT_RISK: { label: 'Riskli', tone: 'text-rose-700 bg-rose-100' },
+} as const;
+
+function WhatIfSimulator({
+  goalId: _goalId,
+  currentMonthly,
+  remainingAmount,
+  targetDate,
+  onApply,
+  applyPending,
+}: {
+  goalId: string;
+  currentMonthly: number;
+  remainingAmount: number;
+  targetDate: Date;
+  onApply: (value: number) => void;
+  applyPending: boolean;
+}) {
+  // Slider range: 0 (azaltma uçu) → mevcut × 3 (büyük artırma uçu)
+  // Step 50 — yuvarlanmış TL değerleri, gereksiz hassasiyet yok.
+  const sliderMax = Math.max(currentMonthly * 3, 1000);
+  const [sliderValue, setSliderValue] = useState(currentMonthly);
+
+  // Mutate başarılı olduktan sonra dış `currentMonthly` değişirse senkronla.
+  useEffect(() => {
+    setSliderValue(currentMonthly);
+  }, [currentMonthly]);
+
+  const sim = simulateGoalContribution({
+    monthlyContribution: sliderValue,
+    remainingAmount,
+    targetDate,
+  });
+
+  const presets: Array<{ label: string; value: number }> = [
+    { label: '-%20', value: Math.max(0, Math.round(currentMonthly * 0.8)) },
+    { label: 'Mevcut', value: currentMonthly },
+    { label: '+%20', value: Math.round(currentMonthly * 1.2) },
+    { label: '+%50', value: Math.round(currentMonthly * 1.5) },
+    { label: '2x', value: Math.round(currentMonthly * 2) },
+  ];
+
+  const isChanged = sliderValue !== currentMonthly;
+  const levelMeta = LEVEL_LABELS[sim.level];
+  const deltaLabel =
+    sim.monthsDelta == null
+      ? null
+      : sim.monthsDelta === 0
+        ? 'Tam hedef tarihinde'
+        : sim.monthsDelta > 0
+          ? `${sim.monthsDelta} ay geç`
+          : `${Math.abs(sim.monthsDelta)} ay erken`;
+
+  return (
+    <div className="ny-card mb-4">
+      <div className="ny-eyebrow mb-3">Aylık katkıyı simüle et</div>
+
+      {/* Slider + numerik gösterim */}
+      <div className="mb-3">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <input
+            type="range"
+            min={0}
+            max={sliderMax}
+            step={50}
+            value={sliderValue}
+            onChange={(e) => setSliderValue(Number(e.target.value))}
+            className="accent-primary flex-1"
+            aria-label="Aylık katkı"
+          />
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="opacity-60">{formatTRY(0)}</span>
+          <span className="text-primary text-base font-bold">{formatTRY(sliderValue)} / ay</span>
+          <span className="opacity-60">{formatTRY(sliderMax)}</span>
+        </div>
+      </div>
+
+      {/* Simülasyon sonucu */}
+      <div className="mb-3 rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3">
+        {sim.projectedMonthsToGoal == null ? (
+          <div className="text-sm">
+            Aylık katkı <b>0 ₺</b> ile hedefe ulaşılamıyor.
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                Hedefe <b>{sim.projectedMonthsToGoal} ay</b>
+                {sim.projectedEtaDate && (
+                  <>
+                    {' '}
+                    (
+                    {sim.projectedEtaDate.toLocaleDateString('tr-TR', {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                    )
+                  </>
+                )}
+              </div>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${levelMeta.tone}`}
+              >
+                {levelMeta.label.toUpperCase()}
+              </span>
+            </div>
+            {deltaLabel && (
+              <div className="mt-1 text-xs opacity-70">
+                Hedef tarihine {sim.targetMonthsRemaining} ay var — <b>{deltaLabel}</b> ulaşacaksın.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Quick presets */}
+      <div className="mb-3 flex flex-wrap gap-2">
+        {presets.map((p) => {
+          const active = sliderValue === p.value;
+          return (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => setSliderValue(p.value)}
+              className={`ny-chip text-xs ${active ? 'border-primary text-primary' : ''}`}
+              aria-label={`${p.label}: ${formatTRY(p.value)}`}
+            >
+              {p.label}
+              <span className="ml-1 opacity-60">{formatTRY(p.value)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Apply */}
+      <button
+        type="button"
+        onClick={() => onApply(sliderValue)}
+        disabled={!isChanged || applyPending}
+        className="ny-pill w-full disabled:opacity-40"
+      >
+        {applyPending
+          ? 'Uygulanıyor…'
+          : isChanged
+            ? `Bu katkıyı uygula (${formatTRY(sliderValue)} / ay)`
+            : 'Mevcut katkı — değişiklik yok'}
+      </button>
+    </div>
   );
 }

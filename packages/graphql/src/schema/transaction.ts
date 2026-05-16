@@ -2,8 +2,10 @@
  * Transaction tipi + query'ler + editTransactionCategory mutation.
  */
 import type { SpendingCategory } from '@prisma/client';
+import { projectSavingsHorizon } from '@niyet/core';
 
 import { builder } from '../builder';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { PeriodEnum, SpendingCategoryRef } from './enums';
 
 builder.prismaObject('Transaction', {
@@ -139,6 +141,8 @@ const DashboardStats = builder.simpleObject('DashboardStats', {
     totalAcceptedContributions: t.float(),
     /// Son 30 günde kabul edilmiş katkı toplamı
     acceptedContributionsLast30d: t.float(),
+    /// Bugün (00:00'dan itibaren) açılan tasarruf fırsatı toplamı
+    todayOpportunity: t.float(),
   }),
 });
 
@@ -153,40 +157,48 @@ builder.queryField('dashboard', (t) =>
       const since7 = new Date();
       since7.setDate(since7.getDate() - 7);
 
-      const [txs30, txs7, rulesCount, goalsCount, allContribs, contribs30] = await Promise.all([
-        ctx.prisma.transaction.findMany({
-          where: { userId, occurredAt: { gte: since30 } },
-          select: { amount: true, opportunity: true },
-        }),
-        ctx.prisma.transaction.findMany({
-          where: { userId, occurredAt: { gte: since7 } },
-          select: { opportunity: true },
-        }),
-        ctx.prisma.rule.count({ where: { userId, active: true } }),
-        ctx.prisma.goal.count({ where: { userId, status: 'ACTIVE' } }),
-        ctx.prisma.microContribution.findMany({
-          where: { userId, status: { not: 'REVERSED' } },
-          select: { amount: true },
-        }),
-        ctx.prisma.microContribution.findMany({
-          where: {
-            userId,
-            status: { not: 'REVERSED' },
-            createdAt: { gte: since30 },
-          },
-          select: { amount: true },
-        }),
-      ]);
+      const sinceToday = new Date();
+      sinceToday.setHours(0, 0, 0, 0);
+
+      const [txs30, txs7, txsToday, rulesCount, goalsCount, allContribs, contribs30] =
+        await Promise.all([
+          ctx.prisma.transaction.findMany({
+            where: { userId, occurredAt: { gte: since30 } },
+            select: { amount: true, opportunity: true },
+          }),
+          ctx.prisma.transaction.findMany({
+            where: { userId, occurredAt: { gte: since7 } },
+            select: { opportunity: true },
+          }),
+          ctx.prisma.transaction.findMany({
+            where: { userId, occurredAt: { gte: sinceToday } },
+            select: { opportunity: true },
+          }),
+          ctx.prisma.rule.count({ where: { userId, active: true } }),
+          ctx.prisma.goal.count({ where: { userId, status: 'ACTIVE' } }),
+          ctx.prisma.microContribution.findMany({
+            where: { userId, status: { not: 'REVERSED' } },
+            select: { amount: true },
+          }),
+          ctx.prisma.microContribution.findMany({
+            where: {
+              userId,
+              status: { not: 'REVERSED' },
+              createdAt: { gte: since30 },
+            },
+            select: { amount: true },
+          }),
+        ]);
+
+      const sumOpportunity = (rows: Array<{ opportunity: unknown }>) =>
+        rows.reduce((s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0), 0);
 
       return {
         totalSpentLast30d: Math.round(txs30.reduce((s, t) => s + Number(t.amount), 0)),
-        totalOpportunityLast30d: Math.round(
-          txs30.reduce((s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0), 0),
-        ),
+        totalOpportunityLast30d: Math.round(sumOpportunity(txs30)),
         txCountLast30d: txs30.length,
-        weeklySaved: Math.round(
-          txs7.reduce((s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0), 0),
-        ),
+        weeklySaved: Math.round(sumOpportunity(txs7)),
+        todayOpportunity: Math.round(sumOpportunity(txsToday)),
         activeRulesCount: rulesCount,
         activeGoalsCount: goalsCount,
         totalAcceptedContributions: Math.round(
@@ -195,6 +207,94 @@ builder.queryField('dashboard', (t) =>
         acceptedContributionsLast30d: Math.round(
           contribs30.reduce((s, c) => s + Number(c.amount), 0),
         ),
+      };
+    },
+  }),
+);
+
+// ─────────────────────────────────────────────────────────────
+// Savings projection — PBI: bugünkü küçük tasarrufun aylık/yıllık/uzun vadeli etkisi
+// ─────────────────────────────────────────────────────────────
+
+const SavingsHorizonPointType = builder.simpleObject('SavingsHorizonPoint', {
+  description: 'Uzun vadeli compound noktası (5/10/30 yıl gibi)',
+  fields: (t) => ({
+    years: t.int(),
+    totalAmount: t.float(),
+    totalContributed: t.float(),
+    growth: t.float(),
+  }),
+});
+
+const SavingsProjectionType = builder.simpleObject('SavingsProjection', {
+  description:
+    'Bugünkü tasarruf fırsatının aylık → yıllık → uzun vadeli (compound) projeksiyonu. ' +
+    'Demo aşamasında basit FV-of-annuity formülü; yatırım tavsiyesi değildir.',
+  fields: (t) => ({
+    /// Bugün için referans alınan günlük tasarruf tutarı (TL)
+    todayAmount: t.float(),
+    /// Bugünkü davranış 30 gün devam ederse aylık birikim (todayAmount × 30)
+    monthlyAmount: t.float(),
+    /// Bugünkü davranış bir yıl devam ederse yıllık birikim (monthlyAmount × 12)
+    yearlyAmount: t.float(),
+    /// Compound noktaları (default 5/10/30 yıl)
+    horizon: t.field({ type: [SavingsHorizonPointType] }),
+    /// Hesapta kullanılan yıllık nominal getiri oranı (% — default 5)
+    annualReturnPct: t.float(),
+    /// `todayAmount` 0 ise son 7 günün ortalaması fallback olarak kullanıldı mı?
+    isEstimated: t.boolean(),
+  }),
+});
+
+builder.queryField('savingsProjection', (t) =>
+  t.field({
+    type: SavingsProjectionType,
+    authScopes: { authenticated: true },
+    args: {
+      /// %5 default (Türkiye reel getiri varsayımı). Slider için açık.
+      annualReturnPct: t.arg.float({ required: false, defaultValue: 5 }),
+    },
+    resolve: async (_root, args, ctx) => {
+      const userId = ctx.userId!;
+      const sinceToday = new Date();
+      sinceToday.setHours(0, 0, 0, 0);
+      const since7 = new Date();
+      since7.setDate(since7.getDate() - 7);
+
+      const [txsToday, txs7] = await Promise.all([
+        ctx.prisma.transaction.findMany({
+          where: { userId, occurredAt: { gte: sinceToday } },
+          select: { opportunity: true },
+        }),
+        ctx.prisma.transaction.findMany({
+          where: { userId, occurredAt: { gte: since7 } },
+          select: { opportunity: true },
+        }),
+      ]);
+
+      const sumOpp = (rows: Array<{ opportunity: unknown }>) =>
+        rows.reduce((s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0), 0);
+
+      const todayRaw = sumOpp(txsToday);
+      let todayAmount = todayRaw;
+      let isEstimated = false;
+      // Demo edge: bugün hiç fırsat yoksa son 7 günden günlük ortalama göster
+      if (todayRaw <= 0) {
+        const weeklyOpp = sumOpp(txs7);
+        if (weeklyOpp > 0) {
+          todayAmount = weeklyOpp / 7;
+          isEstimated = true;
+        }
+      }
+
+      const projection = projectSavingsHorizon({
+        todayAmount,
+        annualReturnPct: args.annualReturnPct ?? 5,
+      });
+
+      return {
+        ...projection,
+        isEstimated,
       };
     },
   }),
@@ -222,11 +322,13 @@ builder.mutationField('editTransactionCategory', (t) =>
       if (!tx || tx.userId !== ctx.userId) {
         throw new Error('Transaction bulunamadı veya erişim reddedildi.');
       }
-      return ctx.prisma.transaction.update({
+      const updated = await ctx.prisma.transaction.update({
         ...query,
         where: { id: String(args.id) },
         data: { category: args.category, categoryEdited: true },
       });
+      await recomputeAndPersistFutureScore(ctx, ctx.userId!, 'TRANSACTION_CHANGED');
+      return updated;
     },
   }),
 );

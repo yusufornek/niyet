@@ -12,19 +12,22 @@ Niyet, kullanıcının kredi kartı ve banka hareketlerini izinli şekilde anali
 ## Hızlı Başlangıç
 
 ### Önkoşullar
+
 - [Bun](https://bun.sh) ≥ 1.1
 - Node.js ≥ 20 (Vercel runtime için)
 - [Supabase](https://supabase.com) hesabı (DB + Auth)
 - [Gemini API key](https://aistudio.google.com/app/apikey)
+- RapidAPI product search key (hedef fiyat takibi için)
 
 ### Setup
+
 ```bash
 # 1. Dependencies
 bun install
 
 # 2. Environment variables
 cp .env.example .env.local
-# .env.local dosyasını doldur (Supabase URL'leri, Gemini key, ...)
+# .env.local dosyasını doldur (Supabase URL'leri, Gemini key, RapidAPI key, ...)
 
 # 3. Database
 bun db:generate    # Prisma client üretir
@@ -39,17 +42,17 @@ Tarayıcıda: <http://localhost:3000>
 
 ### Sık Kullanılan Komutlar
 
-| Komut | Açıklama |
-|---|---|
-| `bun dev` | Tüm paketleri dev mode'da çalıştır |
-| `bun build` | Production build |
-| `bun lint` | ESLint tüm workspace |
-| `bun type-check` | TypeScript tip kontrolü |
-| `bun test` | Vitest unit test'leri |
-| `bun test:e2e` | Playwright e2e |
-| `bun db:studio` | Prisma Studio (DB visual editor) |
-| `bun db:reset` | DB'yi sıfırla ve yeniden seed et |
-| `bun format` | Prettier ile tüm kod biçimle |
+| Komut            | Açıklama                           |
+| ---------------- | ---------------------------------- |
+| `bun dev`        | Tüm paketleri dev mode'da çalıştır |
+| `bun build`      | Production build                   |
+| `bun lint`       | ESLint tüm workspace               |
+| `bun type-check` | TypeScript tip kontrolü            |
+| `bun test`       | Vitest unit test'leri              |
+| `bun test:e2e`   | Playwright e2e                     |
+| `bun db:studio`  | Prisma Studio (DB visual editor)   |
+| `bun db:reset`   | DB'yi sıfırla ve yeniden seed et   |
+| `bun format`     | Prettier ile tüm kod biçimle       |
 
 ---
 
@@ -95,6 +98,7 @@ Karar gerekçeleri için [HANDOFF.md](./HANDOFF.md), [MEMORY.md](./MEMORY.md) (A
 ## Katkıda Bulunma
 
 [CONTRIBUTING.md](./CONTRIBUTING.md) dokümanına bakın. Özetle:
+
 - **Branching**: Feature-branch + manuel merge. Her özellik/faz kendi branch'inde geliştirilir; proje sahibi explicit onay ile main'e geçer (squash-merge).
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) (feat:/fix:/docs:/...)
 - **CI gate'leri**: lint + type-check + test her push'ta çalışır.

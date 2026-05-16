@@ -41,6 +41,11 @@ Niyet'in **Vercel** üzerinde sürekli erişilebilir bir URL'de yayınlanması i
 | `SUPABASE_SERVICE_ROLE_KEY`     | `eyJhbGciOi...` (service_role JWT)                                                                                      | **Yalnızca server**, `NEXT_PUBLIC_*` prefix yok                                                                                                                         |
 | `GEMINI_API_KEY`                | `AIzaSy...`                                                                                                             | <https://aistudio.google.com/app/apikey>'den al                                                                                                                         |
 | `GEMINI_MODEL`                  | `gemini-2.5-flash`                                                                                                      | (opsiyonel, default)                                                                                                                                                    |
+| `RAPIDAPI_KEY`                  | `...`                                                                                                                   | Goal tracking ürün fiyat servisi                                                                                                                                        |
+| `RAPIDAPI_HOST`                 | `real-time-product-search.p.rapidapi.com`                                                                               | (opsiyonel, default)                                                                                                                                                    |
+| `CRON_SECRET`                   | güçlü random string                                                                                                     | Vercel cron endpoint authorization                                                                                                                                      |
+| `PRICE_REFRESH_BATCH_LIMIT`     | `20`                                                                                                                    | Tek cron run'ında en fazla kaç hedef yenilenir                                                                                                                          |
+| `PRICE_REFRESH_CONCURRENCY`     | `2`                                                                                                                     | Aynı anda kaç external fiyat sorgusu yapılır                                                                                                                            |
 | `NEXT_PUBLIC_APP_URL`           | `https://niyet.vercel.app`                                                                                              | Production domain                                                                                                                                                       |
 | `NEXT_PUBLIC_APP_ENV`           | `production`                                                                                                            | (preview/development için ayarla)                                                                                                                                       |
 
@@ -62,6 +67,10 @@ ADR-009 sözleşmesi gereği:
 - **Feature branch push** → Preview deploy (`niyet-git-feat-xxx.vercel.app`)
 
 Her PR/push için Vercel otomatik build + URL üretir. Production'a ne girdiğini görmek için commit history yeterli.
+
+### Scheduled Functions
+
+`vercel.json` içinde `/api/cron/refresh-goal-prices` günlük çalışır. Endpoint `Authorization: Bearer <CRON_SECRET>` bekler. Cron hedefleri kendi `nextPriceCheckAt` değerine göre seçer; yakın hedefler günlük, orta vade 3 günde bir, uzak hedefler haftalık yenilenir.
 
 ---
 
@@ -133,6 +142,10 @@ Migration build sırasında çalışıyorsa (önerilmez). `vercel.json` build ko
 ### Build > 50 min timeout (Hobby plan)
 
 Bun install + Prisma generate + Next.js build > 50 dk olursa Vercel Hobby'de fail olur. Çözüm: Pro plan (build limiti yok) veya Turborepo remote cache ekle.
+
+### Goal price cron 401 dönüyor
+
+`CRON_SECRET` Vercel env'de yok veya endpoint'e gelen `Authorization` header'ı eşleşmiyor. Vercel Scheduled Functions otomatik bearer header gönderir; local testte header'ı elle ekle.
 
 ---
 

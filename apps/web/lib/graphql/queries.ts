@@ -35,6 +35,9 @@ export type SubscriptionStatus = 'ACTIVE' | 'CANCELLABLE' | 'CANCELED';
 export type NotificationType =
   | 'SPENDING_ALERT'
   | 'GOAL_MILESTONE'
+  | 'GOAL_PRICE_ALERT'
+  | 'LEARN_UPDATE'
+  | 'FINANCE_NEWS_IMPORTANT'
   | 'AI_INSIGHT'
   | 'ANALYSIS_COMPLETE'
   | 'RULE_TRIGGERED'
@@ -50,6 +53,7 @@ export interface DashboardStats {
   activeGoalsCount: number;
   totalAcceptedContributions: number;
   acceptedContributionsLast30d: number;
+  todayOpportunity: number;
 }
 
 export type ContributionSource =
@@ -127,12 +131,21 @@ export interface SendMessageResponse {
   stubMode: boolean;
 }
 
+export interface PauseStatus {
+  isPaused: boolean;
+  pausedUntil: string | null;
+  remainingDays: number | null;
+  summary: string;
+}
+
 export interface Me {
   id: string;
   email: string;
   name: string;
   age: number;
   monthlyIncome: number;
+  pausedUntil?: string | null;
+  pauseStatus?: PauseStatus;
 }
 
 export interface CategoryBreakdownRow {
@@ -186,6 +199,25 @@ export interface GoalCheckpoint {
   reachedAt: string | null;
 }
 
+export type GoalPlanLevel = 'ON_TRACK' | 'STRETCH' | 'AT_RISK';
+
+export interface GoalSavingsPlan {
+  requiredMonthlyContribution: number;
+  suggestedMonthlyContribution: number;
+  monthlyGap: number;
+  /** null = ulaşılmıyor (katkı 0 veya Infinity) */
+  projectedMonthsToGoal: number | null;
+  targetMonthsRemaining: number;
+  level: GoalPlanLevel;
+  summary: string;
+}
+
+export interface ContributionTimelinePoint {
+  periodStart: string; // YYYY-MM-01
+  periodAmount: number;
+  cumulativeAmount: number;
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -208,8 +240,13 @@ export interface Goal {
   productSource?: string | null;
   currency?: string;
   lastCheckedAt?: string | null;
+  nextPriceCheckAt?: string | null;
+  planSummary?: string | null;
+  planGeneratedAt?: string | null;
   trackedProgress?: number;
   trackedRemainingAmount?: number;
+  savingsPlan?: GoalSavingsPlan;
+  contributionTimeline?: ContributionTimelinePoint[];
 }
 
 export interface ProductQueryNormalization {
@@ -261,6 +298,15 @@ export interface FundRecommendation {
   score: number;
 }
 
+export interface InflationRate {
+  annualRate: number;
+  monthlyRate: number | null;
+  period: string;
+  publishedAt: string;
+  source: string;
+  sourceUrl: string;
+}
+
 export interface FutureScore {
   id: string;
   score: number;
@@ -271,12 +317,35 @@ export interface FutureScore {
   computedAt: string;
 }
 
+export interface FutureScoreDriver {
+  metric: string;
+  delta: number;
+  direction: 'UP' | 'DOWN' | 'FLAT';
+}
+
+export interface UserBadge {
+  key: string;
+  title: string;
+  unlockedAt: string;
+}
+
+export interface FutureScoreInsights {
+  current: FutureScore | null;
+  previous: FutureScore | null;
+  delta: number;
+  label: string;
+  status: string;
+  topDriver: FutureScoreDriver;
+  badges: UserBadge[];
+}
+
 export interface NotificationItem {
   id: string;
   type: NotificationType;
   title: string;
   body: string;
   read: boolean;
+  payload: unknown | null;
   createdAt: string;
 }
 
@@ -322,16 +391,76 @@ export interface Circle {
   }>;
 }
 
+export interface LearnQuizItem {
+  id: string;
+  question: string;
+  options: string[];
+  explanation: string;
+}
+
+export interface LearnCard {
+  id: string;
+  orderNo: number;
+  title: string;
+  shortDescription: string;
+  body: string;
+  sourceName: string;
+  sourceUrl: string;
+  sourceUpdatedAt: string | null;
+  completed: boolean;
+  quizItems: LearnQuizItem[];
+}
+
+export interface LearnUserState {
+  totalXp: number;
+  level: number;
+  streakDays: number;
+  lastActiveDate: string | null;
+}
+
+export interface LearnLeaderboardEntry {
+  userId: string;
+  userName: string;
+  totalXp: number;
+}
+
+export interface LearnHome {
+  packId: string;
+  packDate: string;
+  summary: string;
+  state: LearnUserState;
+  cards: LearnCard[];
+  leaderboard: LearnLeaderboardEntry[];
+}
+
+export interface FinanceNewsItem {
+  id: string;
+  title: string;
+  summaryShort: string;
+  sourceName: string;
+  sourceUrl: string;
+  publishedAt: string;
+  isImportant: boolean;
+  importanceScore: number;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Query string'leri
 // ─────────────────────────────────────────────────────────────
 
-const ME_Q = `query Me { me { id email name age monthlyIncome } }`;
+const ME_Q = `query Me {
+  me {
+    id email name age monthlyIncome
+    pausedUntil
+    pauseStatus { isPaused pausedUntil remainingDays summary }
+  }
+}`;
 const DASHBOARD_Q = `query Dashboard {
   dashboard {
     totalSpentLast30d totalOpportunityLast30d txCountLast30d weeklySaved
     activeRulesCount activeGoalsCount
     totalAcceptedContributions acceptedContributionsLast30d
+    todayOpportunity
   }
 }`;
 const CATEGORY_BREAKDOWN_Q = `query CategoryBreakdown($period: Period!) {
@@ -385,8 +514,8 @@ const CHAT_SESSION_Q = `query ChatSession($id: ID!) {
     messages { id role content toolName tokensUsed createdAt }
   }
 }`;
-const SEND_CHAT_M = `mutation SendChatMessage($message: String!, $sessionId: ID, $goalContext: String) {
-  sendChatMessage(message: $message, sessionId: $sessionId, goalContext: $goalContext) {
+const SEND_CHAT_M = `mutation SendChatMessage($message: String!, $sessionId: ID, $goalContext: String, $goalId: ID) {
+  sendChatMessage(message: $message, sessionId: $sessionId, goalContext: $goalContext, goalId: $goalId) {
     sessionId reply totalTokens geminiModel stubMode
     recommendation { actionType label targetRef reasoning }
   }
@@ -415,17 +544,22 @@ const CANCEL_SUB_M = `mutation CancelSubscription($id: ID!, $contributionAmount:
 const GOALS_Q = `query Goals {
   goals {
     id name basePrice currentPrice inflationPct targetDate current
-    monthlyContribution status autoUpdate
+    monthlyContribution status autoUpdate planSummary planGeneratedAt
   }
 }`;
 const GOAL_Q = `query Goal($id: ID!) {
   goal(id: $id) {
     id name basePrice currentPrice inflationPct targetDate current
-    monthlyContribution status autoUpdate priceHistory
+    monthlyContribution status autoUpdate priceHistory planSummary planGeneratedAt
     rawQuery normalizedQuery category selectedProductTitle productUrl
-    productImage productSource currency lastCheckedAt
+    productImage productSource currency lastCheckedAt nextPriceCheckAt
     trackedProgress trackedRemainingAmount
     checkpoints { id percent label reached reachedAt }
+    savingsPlan {
+      requiredMonthlyContribution suggestedMonthlyContribution monthlyGap
+      projectedMonthsToGoal targetMonthsRemaining level summary
+    }
+    contributionTimeline { periodStart periodAmount cumulativeAmount }
   }
 }`;
 const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {
@@ -439,12 +573,28 @@ const FUND_RECOMMENDATIONS_Q = `query FundRecommendations($input: FundRecommenda
     id name summary riskBand horizonBand expectedReturnBand whyFits score
   }
 }`;
+const LATEST_INFLATION_RATE_Q = `query LatestInflationRate {
+  latestInflationRate {
+    annualRate monthlyRate period publishedAt source sourceUrl
+  }
+}`;
 const FUTURE_SCORE_Q = `query FutureScore {
   futureScore { id score contribution discipline consistency social computedAt }
 }`;
+const FUTURE_SCORE_INSIGHTS_Q = `query FutureScoreInsights {
+  futureScoreInsights {
+    current { id score contribution discipline consistency social computedAt }
+    previous { id score contribution discipline consistency social computedAt }
+    delta
+    label
+    status
+    topDriver { metric delta direction }
+    badges { key title unlockedAt }
+  }
+}`;
 const NOTIFICATIONS_Q = `query Notifications($unreadOnly: Boolean) {
   notifications(unreadOnly: $unreadOnly) {
-    id type title body read createdAt
+    id type title body read payload createdAt
   }
 }`;
 const ANALYSIS_HISTORY_Q = `query AnalysisHistory($limit: Int) {
@@ -465,6 +615,44 @@ const CIRCLES_Q = `query Circles {
   circles {
     id name target type
     members { id contribution user { id name } }
+  }
+}`;
+const LEARN_HOME_Q = `query LearnHome($date: DateTime) {
+  learnHome(date: $date) {
+    packId packDate summary
+    state { totalXp level streakDays lastActiveDate }
+    leaderboard { userId userName totalXp }
+    cards {
+      id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+      quizItems { id question options explanation }
+    }
+  }
+}`;
+const LEARN_CARD_Q = `query LearnCard($id: ID!) {
+  learnCard(id: $id) {
+    id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+    quizItems { id question options explanation }
+  }
+}`;
+const LEARN_HISTORY_Q = `query LearnHistory($limit: Int) {
+  learnHistory(limit: $limit) {
+    packId packDate summary
+    state { totalXp level streakDays lastActiveDate }
+    leaderboard { userId userName totalXp }
+    cards {
+      id orderNo title shortDescription body sourceName sourceUrl sourceUpdatedAt completed
+      quizItems { id question options explanation }
+    }
+  }
+}`;
+const FINANCE_NEWS_FEED_Q = `query FinanceNewsFeed($limit: Int, $importantOnly: Boolean) {
+  financeNewsFeed(limit: $limit, importantOnly: $importantOnly) {
+    id title summaryShort sourceName sourceUrl publishedAt isImportant importanceScore
+  }
+}`;
+const FINANCE_NEWS_ITEM_Q = `query FinanceNewsItem($id: ID!) {
+  financeNewsItem(id: $id) {
+    id title summaryShort sourceName sourceUrl publishedAt isImportant importanceScore
   }
 }`;
 
@@ -576,10 +764,26 @@ export const useFundRecommendations = (input: {
     enabled: input.enabled ?? true,
   });
 
+export const useLatestInflationRate = () =>
+  useQuery({
+    queryKey: ['latestInflationRate'],
+    queryFn: () =>
+      gqlFetcher<{ latestInflationRate: InflationRate | null }, undefined>(LATEST_INFLATION_RATE_Q),
+    staleTime: 12 * 60 * 60 * 1000,
+  });
+
 export const useFutureScore = () =>
   useQuery({
     queryKey: ['futureScore'],
     queryFn: () => gqlFetcher<{ futureScore: FutureScore | null }, undefined>(FUTURE_SCORE_Q),
+    staleTime: 60_000,
+  });
+
+export const useFutureScoreInsights = () =>
+  useQuery({
+    queryKey: ['futureScoreInsights'],
+    queryFn: () =>
+      gqlFetcher<{ futureScoreInsights: FutureScoreInsights }, undefined>(FUTURE_SCORE_INSIGHTS_Q),
     staleTime: 60_000,
   });
 
@@ -619,6 +823,55 @@ export const useCircles = () =>
     queryKey: ['circles'],
     queryFn: () => gqlFetcher<{ circles: Circle[] }, undefined>(CIRCLES_Q),
     staleTime: 60_000,
+  });
+
+export const useLearnHome = (date?: string | null) =>
+  useQuery({
+    queryKey: ['learnHome', date ?? null],
+    queryFn: () =>
+      gqlFetcher<{ learnHome: LearnHome | null }, { date?: string | null }>(LEARN_HOME_Q, {
+        date: date ?? null,
+      }),
+    staleTime: 60_000,
+  });
+
+export const useLearnCard = (id: string) =>
+  useQuery({
+    queryKey: ['learnCard', id],
+    queryFn: () =>
+      gqlFetcher<{ learnCard: LearnCard | null }, { id: string }>(LEARN_CARD_Q, { id }),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+
+export const useLearnHistory = (limit = 10) =>
+  useQuery({
+    queryKey: ['learnHistory', limit],
+    queryFn: () =>
+      gqlFetcher<{ learnHistory: LearnHome[] }, { limit: number }>(LEARN_HISTORY_Q, { limit }),
+    staleTime: 60_000,
+  });
+
+export const useFinanceNewsFeed = (limit = 20, importantOnly = false) =>
+  useQuery({
+    queryKey: ['financeNewsFeed', limit, importantOnly],
+    queryFn: () =>
+      gqlFetcher<{ financeNewsFeed: FinanceNewsItem[] }, { limit: number; importantOnly: boolean }>(
+        FINANCE_NEWS_FEED_Q,
+        { limit, importantOnly },
+      ),
+    staleTime: 60_000,
+  });
+
+export const useFinanceNewsItem = (id: string) =>
+  useQuery({
+    queryKey: ['financeNewsItem', id],
+    queryFn: () =>
+      gqlFetcher<{ financeNewsItem: FinanceNewsItem | null }, { id: string }>(FINANCE_NEWS_ITEM_Q, {
+        id,
+      }),
+    staleTime: 60_000,
+    enabled: !!id,
   });
 
 export const useMicroContributions = (
@@ -662,7 +915,7 @@ const EDIT_TRANSACTION_CATEGORY_M = `mutation EditTxCategory($id: ID!, $category
 
 const CREATE_GOAL_M = `mutation CreateGoal($input: GoalInput!) {
   createGoal(input: $input) {
-    id name basePrice currentPrice targetDate current monthlyContribution status
+    id name basePrice currentPrice targetDate current monthlyContribution status planSummary planGeneratedAt
   }
 }`;
 
@@ -706,6 +959,12 @@ const RUN_ANALYSIS_M = `mutation RunAnalysis($forceRefresh: Boolean) {
 
 const MARK_NOTIFICATION_READ_M = `mutation MarkNotificationRead($id: ID!) {
   markNotificationRead(id: $id) { id read }
+}`;
+const COMPLETE_LEARN_CARD_M = `mutation CompleteLearnCard($cardId: ID!, $quizAnswers: [Int!]!) {
+  completeLearnCard(cardId: $cardId, quizAnswers: $quizAnswers) {
+    xpEarned quizScore
+    state { totalXp level streakDays lastActiveDate }
+  }
 }`;
 
 export function useEditTransactionCategory() {
@@ -871,6 +1130,28 @@ export function useMarkNotificationRead() {
   });
 }
 
+export function useCompleteLearnCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, quizAnswers }: { cardId: string; quizAnswers: number[] }) =>
+      gqlFetcher<
+        {
+          completeLearnCard: {
+            xpEarned: number;
+            quizScore: number;
+            state: LearnUserState;
+          };
+        },
+        { cardId: string; quizAnswers: number[] }
+      >(COMPLETE_LEARN_CARD_M, { cardId, quizAnswers }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['learnHome'] });
+      void qc.invalidateQueries({ queryKey: ['learnHistory'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 /** Tüm contribution-related query'leri yenile (tek yerden DRY) */
 function invalidateContributionQueries(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ['microContributions'] });
@@ -1014,10 +1295,15 @@ export const useChatSession = (id: string | null) =>
 export function useSendChatMessage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { message: string; sessionId?: string; goalContext?: string }) =>
+    mutationFn: (vars: {
+      message: string;
+      sessionId?: string;
+      goalContext?: string;
+      goalId?: string;
+    }) =>
       gqlFetcher<
         { sendChatMessage: SendMessageResponse },
-        { message: string; sessionId?: string; goalContext?: string }
+        { message: string; sessionId?: string; goalContext?: string; goalId?: string }
       >(SEND_CHAT_M, vars),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ['chatSession', data.sendChatMessage.sessionId] });
@@ -1036,5 +1322,476 @@ export function useDeleteChatSession() {
       void qc.invalidateQueries({ queryKey: ['chatSessions'] });
       toast.success('Sohbet silindi');
     },
+  });
+}
+
+// ───────────────────────────────────────────────────────────
+// Rules (auto-contribution) — eklenmek istenen: payday katkı kuralı
+// ───────────────────────────────────────────────────────────
+
+export type RuleFrequency = 'WEEKLY' | 'MONTHLY' | 'PAYDAY' | 'ONE_TIME';
+
+export interface Rule {
+  id: string;
+  label: string;
+  amount: number;
+  frequency: RuleFrequency;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RuleTriggerResult {
+  ruleId: string;
+  userId: string;
+  amount: number;
+  microContributionId: string;
+  notificationId: string;
+}
+
+export interface CreateRuleInput {
+  label: string;
+  amount: number;
+  frequency: RuleFrequency;
+  payday?: number | null;
+}
+
+export interface UpdateRuleInput {
+  label?: string;
+  amount?: number;
+  active?: boolean;
+}
+
+const RULES_Q = `query Rules {
+  rules { id label amount frequency active createdAt }
+}`;
+
+const CREATE_RULE_M = `mutation CreateRule($input: CreateRuleInput!) {
+  createRule(input: $input) { id label amount frequency active createdAt }
+}`;
+
+const UPDATE_RULE_M = `mutation UpdateRule($ruleId: ID!, $input: UpdateRuleInput!) {
+  updateRule(ruleId: $ruleId, input: $input) { id label amount frequency active createdAt }
+}`;
+
+const DELETE_RULE_M = `mutation DeleteRule($ruleId: ID!) {
+  deleteRule(ruleId: $ruleId)
+}`;
+
+const TRIGGER_RULE_M = `mutation TriggerRule($ruleId: ID!) {
+  triggerRule(ruleId: $ruleId) {
+    ruleId userId amount microContributionId notificationId
+  }
+}`;
+
+export function useRules() {
+  return useQuery({
+    queryKey: ['rules'],
+    queryFn: () => gqlFetcher<{ rules: Rule[] }, undefined>(RULES_Q),
+    select: (data) => data.rules,
+  });
+}
+
+export function useCreateRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateRuleInput) =>
+      gqlFetcher<{ createRule: Rule }, { input: CreateRuleInput }>(CREATE_RULE_M, { input }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rules'] });
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success('Katkı kuralı oluşturuldu');
+    },
+    onError: (e: Error) => toast.error('Kural oluşturulamadı', { description: e.message }),
+  });
+}
+
+export function useUpdateRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { ruleId: string; input: UpdateRuleInput }) =>
+      gqlFetcher<{ updateRule: Rule }, { ruleId: string; input: UpdateRuleInput }>(
+        UPDATE_RULE_M,
+        vars,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rules'] });
+    },
+    onError: (e: Error) => toast.error('Kural güncellenemedi', { description: e.message }),
+  });
+}
+
+export function useDeleteRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) =>
+      gqlFetcher<{ deleteRule: boolean }, { ruleId: string }>(DELETE_RULE_M, { ruleId }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rules'] });
+      toast.success('Kural silindi');
+    },
+    onError: (e: Error) => toast.error('Kural silinemedi', { description: e.message }),
+  });
+}
+
+export function useTriggerRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) =>
+      gqlFetcher<{ triggerRule: RuleTriggerResult }, { ruleId: string }>(TRIGGER_RULE_M, {
+        ruleId,
+      }),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('Otomatik katkı eklendi', {
+        description: `${data.triggerRule.amount.toLocaleString('tr-TR')} ₺ emeklilik katkına eklendi.`,
+      });
+    },
+    onError: (e: Error) => toast.error('Kural tetiklenemedi', { description: e.message }),
+  });
+}
+
+// ───────────────────────────────────────────────────────────
+// Savings Projection — PBI: bugünkü tasarrufun aylık/yıllık/uzun vadeli etkisi
+// ───────────────────────────────────────────────────────────
+
+export interface SavingsHorizonPoint {
+  years: number;
+  totalAmount: number;
+  totalContributed: number;
+  growth: number;
+}
+
+export interface SavingsProjection {
+  todayAmount: number;
+  monthlyAmount: number;
+  yearlyAmount: number;
+  horizon: SavingsHorizonPoint[];
+  annualReturnPct: number;
+  isEstimated: boolean;
+}
+
+const SAVINGS_PROJECTION_Q = `query SavingsProjection($annualReturnPct: Float) {
+  savingsProjection(annualReturnPct: $annualReturnPct) {
+    todayAmount
+    monthlyAmount
+    yearlyAmount
+    annualReturnPct
+    isEstimated
+    horizon { years totalAmount totalContributed growth }
+  }
+}`;
+
+export function useSavingsProjection(annualReturnPct?: number) {
+  return useQuery({
+    queryKey: ['savingsProjection', annualReturnPct ?? 5],
+    queryFn: () =>
+      gqlFetcher<{ savingsProjection: SavingsProjection }, { annualReturnPct?: number }>(
+        SAVINGS_PROJECTION_Q,
+        { annualReturnPct },
+      ),
+    select: (data) => data.savingsProjection,
+  });
+}
+
+// ───────────────────────────────────────────────────────────
+// Pause (Nefes Ayı) — PBI: geçici katkı duraklatma
+// ───────────────────────────────────────────────────────────
+
+const PAUSE_M = `mutation PauseContributions($months: Int!) {
+  pauseContributions(months: $months) {
+    id pausedUntil
+    pauseStatus { isPaused pausedUntil remainingDays summary }
+  }
+}`;
+
+const RESUME_M = `mutation ResumeContributions {
+  resumeContributions {
+    id pausedUntil
+    pauseStatus { isPaused pausedUntil remainingDays summary }
+  }
+}`;
+
+export function usePauseContributions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (months: number) =>
+      gqlFetcher<
+        {
+          pauseContributions: { id: string; pausedUntil: string | null; pauseStatus: PauseStatus };
+        },
+        { months: number }
+      >(PAUSE_M, { months }),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      const status = data.pauseContributions.pauseStatus;
+      toast.success('Nefes Ayı başlatıldı', {
+        description: status.summary,
+      });
+    },
+    onError: (e: Error) => toast.error('Duraklatma başarısız', { description: e.message }),
+  });
+}
+
+export function useResumeContributions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      gqlFetcher<{ resumeContributions: { id: string; pausedUntil: string | null } }, undefined>(
+        RESUME_M,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success('Katkılar sürdürüldü');
+    },
+    onError: (e: Error) => toast.error('Sürdürme başarısız', { description: e.message }),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Category Auto-Save — PBI: ortalama-altı kategori farkını otomatik aktar
+// ─────────────────────────────────────────────────────────────
+
+export interface CategoryAutoSaveRule {
+  id: string;
+  category: SpendingCategory;
+  lookbackMonths: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastTriggeredAt: string | null;
+  lastTriggeredMonth: string | null;
+  lastTransferAmount: number | null;
+}
+
+export interface CategoryAutoSaveLookbackMonth {
+  monthYear: string;
+  amount: number;
+  txCount: number;
+}
+
+export interface CategoryAutoSaveShortfall {
+  monthYear: string;
+  currentAmount: number;
+  averageAmount: number | null;
+  lookback: CategoryAutoSaveLookbackMonth[];
+  lookbackMonthsAnalyzed: number;
+  hasSufficientHistory: boolean;
+  shortfallAmount: number;
+  shortfallPct: number | null;
+  shouldTrigger: boolean;
+}
+
+export type CategoryAutoSaveOutcomeStatus =
+  | 'TRIGGERED'
+  | 'SKIPPED_ALREADY_TRIGGERED'
+  | 'SKIPPED_INSUFFICIENT_HISTORY'
+  | 'SKIPPED_NO_SHORTFALL';
+
+export interface CategoryAutoSaveOutcome {
+  ruleId: string;
+  monthYear: string;
+  category: SpendingCategory;
+  status: CategoryAutoSaveOutcomeStatus;
+  shortfall: CategoryAutoSaveShortfall;
+  microContributionId: string | null;
+}
+
+const CATEGORY_AUTO_SAVE_RULES_Q = `query CategoryAutoSaveRules {
+  categoryAutoSaveRules {
+    id category lookbackMonths active createdAt updatedAt
+    lastTriggeredAt lastTriggeredMonth lastTransferAmount
+  }
+}`;
+
+const PREVIEW_CATEGORY_AUTO_SAVE_Q = `query PreviewCategoryAutoSave($category: SpendingCategory!, $lookbackMonths: Int, $monthYear: String) {
+  previewCategoryAutoSave(category: $category, lookbackMonths: $lookbackMonths, monthYear: $monthYear) {
+    monthYear currentAmount averageAmount
+    lookback { monthYear amount txCount }
+    lookbackMonthsAnalyzed hasSufficientHistory
+    shortfallAmount shortfallPct shouldTrigger
+  }
+}`;
+
+const CREATE_CATEGORY_AUTO_SAVE_M = `mutation CreateCategoryAutoSaveRule($category: SpendingCategory!, $lookbackMonths: Int) {
+  createCategoryAutoSaveRule(category: $category, lookbackMonths: $lookbackMonths) {
+    id category lookbackMonths active createdAt
+  }
+}`;
+
+const DELETE_CATEGORY_AUTO_SAVE_M = `mutation DeleteCategoryAutoSaveRule($id: ID!) {
+  deleteCategoryAutoSaveRule(id: $id)
+}`;
+
+const SET_CATEGORY_AUTO_SAVE_ACTIVE_M = `mutation SetCategoryAutoSaveRuleActive($id: ID!, $active: Boolean!) {
+  setCategoryAutoSaveRuleActive(id: $id, active: $active) {
+    id active
+  }
+}`;
+
+const TRIGGER_CATEGORY_AUTO_SAVE_M = `mutation TriggerCategoryAutoSaveRule($id: ID!, $monthYear: String) {
+  triggerCategoryAutoSaveRule(id: $id, monthYear: $monthYear) {
+    ruleId monthYear category status
+    microContributionId
+    shortfall {
+      currentAmount averageAmount shortfallAmount shortfallPct
+      hasSufficientHistory shouldTrigger lookbackMonthsAnalyzed
+      lookback { monthYear amount txCount }
+    }
+  }
+}`;
+
+const RUN_CATEGORY_AUTO_SAVE_FOR_ME_M = `mutation RunCategoryAutoSaveForMe($monthYear: String) {
+  runCategoryAutoSaveForMe(monthYear: $monthYear) {
+    ruleId monthYear category status
+    microContributionId
+    shortfall {
+      currentAmount averageAmount shortfallAmount shortfallPct
+      hasSufficientHistory shouldTrigger lookbackMonthsAnalyzed
+      lookback { monthYear amount txCount }
+    }
+  }
+}`;
+
+export function useCategoryAutoSaveRules() {
+  return useQuery({
+    queryKey: ['category-auto-save-rules'],
+    queryFn: () =>
+      gqlFetcher<{ categoryAutoSaveRules: CategoryAutoSaveRule[] }, undefined>(
+        CATEGORY_AUTO_SAVE_RULES_Q,
+      ),
+    select: (d) => d.categoryAutoSaveRules,
+  });
+}
+
+export function usePreviewCategoryAutoSave(args: {
+  category: SpendingCategory | null;
+  lookbackMonths?: number;
+  monthYear?: string;
+}) {
+  return useQuery({
+    queryKey: [
+      'preview-category-auto-save',
+      args.category,
+      args.lookbackMonths ?? 3,
+      args.monthYear ?? null,
+    ],
+    enabled: Boolean(args.category),
+    queryFn: () =>
+      gqlFetcher<
+        { previewCategoryAutoSave: CategoryAutoSaveShortfall },
+        { category: SpendingCategory; lookbackMonths?: number; monthYear?: string }
+      >(PREVIEW_CATEGORY_AUTO_SAVE_Q, {
+        category: args.category as SpendingCategory,
+        lookbackMonths: args.lookbackMonths ?? 3,
+        monthYear: args.monthYear,
+      }),
+    select: (d) => d.previewCategoryAutoSave,
+  });
+}
+
+export function useCreateCategoryAutoSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { category: SpendingCategory; lookbackMonths?: number }) =>
+      gqlFetcher<
+        { createCategoryAutoSaveRule: CategoryAutoSaveRule },
+        { category: SpendingCategory; lookbackMonths?: number }
+      >(CREATE_CATEGORY_AUTO_SAVE_M, vars),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      toast.success('Otomatik fark kuralı oluşturuldu');
+    },
+    onError: (e: Error) => toast.error('Kural oluşturulamadı', { description: e.message }),
+  });
+}
+
+export function useDeleteCategoryAutoSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<{ deleteCategoryAutoSaveRule: boolean }, { id: string }>(
+        DELETE_CATEGORY_AUTO_SAVE_M,
+        { id },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      toast.success('Kural silindi');
+    },
+    onError: (e: Error) => toast.error('Silinemedi', { description: e.message }),
+  });
+}
+
+export function useSetCategoryAutoSaveRuleActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; active: boolean }) =>
+      gqlFetcher<
+        { setCategoryAutoSaveRuleActive: { id: string; active: boolean } },
+        { id: string; active: boolean }
+      >(SET_CATEGORY_AUTO_SAVE_ACTIVE_M, vars),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+    },
+    onError: (e: Error) => toast.error('Güncellenemedi', { description: e.message }),
+  });
+}
+
+export function useTriggerCategoryAutoSaveRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; monthYear?: string }) =>
+      gqlFetcher<
+        { triggerCategoryAutoSaveRule: CategoryAutoSaveOutcome },
+        { id: string; monthYear?: string }
+      >(TRIGGER_CATEGORY_AUTO_SAVE_M, vars),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['contribution-summary'] });
+      const o = data.triggerCategoryAutoSaveRule;
+      if (o.status === 'TRIGGERED') {
+        toast.success('Fark katkıya aktarıldı', {
+          description: `${o.shortfall.shortfallAmount.toLocaleString('tr-TR')} ₺ emeklilik katkına eklendi.`,
+        });
+      } else if (o.status === 'SKIPPED_ALREADY_TRIGGERED') {
+        toast.info('Bu ay zaten tetiklenmiş');
+      } else if (o.status === 'SKIPPED_INSUFFICIENT_HISTORY') {
+        toast.info('Yeterli geçmiş veri yok', {
+          description: 'Bu kategori için önceki aylarda işlem bulunamadı.',
+        });
+      } else if (o.status === 'SKIPPED_NO_SHORTFALL') {
+        toast.info('Bu ay ortalamanın üstünde', {
+          description: 'Bu ay bu kategoride ortalamanın altında değilsin — fark üretilmedi.',
+        });
+      }
+    },
+    onError: (e: Error) => toast.error('Tetikleme başarısız', { description: e.message }),
+  });
+}
+
+export function useRunCategoryAutoSaveForMe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars?: { monthYear?: string }) =>
+      gqlFetcher<{ runCategoryAutoSaveForMe: CategoryAutoSaveOutcome[] }, { monthYear?: string }>(
+        RUN_CATEGORY_AUTO_SAVE_FOR_ME_M,
+        vars ?? {},
+      ),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['category-auto-save-rules'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['contribution-summary'] });
+      const triggered = data.runCategoryAutoSaveForMe.filter((o) => o.status === 'TRIGGERED');
+      if (triggered.length > 0) {
+        const total = triggered.reduce((s, o) => s + o.shortfall.shortfallAmount, 0);
+        toast.success(`${triggered.length} kategoride fark aktarıldı`, {
+          description: `Toplam ${total.toLocaleString('tr-TR')} ₺ emeklilik katkına eklendi.`,
+        });
+      } else {
+        toast.info('Bu ay aktarılacak fark yok');
+      }
+    },
+    onError: (e: Error) => toast.error('Çalıştırma başarısız', { description: e.message }),
   });
 }

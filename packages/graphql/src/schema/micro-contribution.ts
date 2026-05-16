@@ -8,6 +8,7 @@
 import type { SpendingCategory as SpendingCategoryType } from '@prisma/client';
 
 import { builder } from '../builder';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { ContributionSourceRef, ContributionStatusRef, SpendingCategoryRef } from './enums';
 
 builder.prismaObject('MicroContribution', {
@@ -198,6 +199,7 @@ builder.mutationField('acceptTransactionContribution', (t) =>
           payload: { contributionId: contribution.id, source: 'REDUCIBLE_TRANSACTION' },
         },
       });
+      await recomputeAndPersistFutureScore(ctx, userId, 'CONTRIBUTION_CHANGED');
 
       return ctx.prisma.microContribution.findUniqueOrThrow({
         ...query,
@@ -283,6 +285,7 @@ builder.mutationField('acceptCategoryContribution', (t) =>
           },
         },
       });
+      await recomputeAndPersistFutureScore(ctx, userId, 'CONTRIBUTION_CHANGED');
 
       return ctx.prisma.microContribution.findUniqueOrThrow({
         ...query,
@@ -319,6 +322,7 @@ builder.mutationField('reverseContribution', (t) =>
           data: { status: 'REVERSED', reversedAt: new Date() },
         });
       });
+      await recomputeAndPersistFutureScore(ctx, userId, 'CONTRIBUTION_CHANGED');
 
       return ctx.prisma.microContribution.findUniqueOrThrow({
         ...query,

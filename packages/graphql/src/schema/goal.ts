@@ -1,7 +1,13 @@
 /**
  * Goal + GoalCheckpoint + goal-tracking operations.
  */
-import { calculateProgress, calculateRemainingAmount } from '@niyet/core';
+import {
+  buildContributionTimeline,
+  buildGoalSavingsPlan,
+  calculateNextPriceCheckAt,
+  calculateProgress,
+  calculateRemainingAmount,
+} from '@niyet/core';
 
 import { builder } from '../builder';
 import type { GraphQLContext } from '../context';
@@ -15,7 +21,39 @@ import {
   NormalizeGoalProductQueryInputSchema,
   SearchGoalProductsInputSchema,
 } from '../goal-tracking/validation';
+import { fetchLatestTuikInflationRate } from '../inflation/tuik';
+import { recomputeAndPersistFutureScore } from '../score/service';
 import { GoalStatusRef, PriceAlertDirectionRef } from './enums';
+
+const GoalPlanLevelRef = builder.enumType('GoalPlanLevel', {
+  description:
+    'Hedef planının gerçekçilik seviyesi. ON_TRACK: önerilen katkı yeterli. ' +
+    'STRETCH: ulaşılabilir ama gap var. AT_RISK: mevcut hızla hedef tarihine yetişemiyor.',
+  values: ['ON_TRACK', 'STRETCH', 'AT_RISK'] as const,
+});
+
+const GoalSavingsPlanType = builder.simpleObject('GoalSavingsPlan', {
+  description:
+    'Hedef için tasarruf planı: kullanıcının davranışsal kapasitesi ile hedef tarihi ' +
+    "arasında gerçekçilik değerlendirmesi. Pure logic (packages/core); her query'de " +
+    "fresh hesaplanır, DB'ye persist edilmez.",
+  fields: (t) => ({
+    /// Hedef tarihine yetişmek için ayda yatırılması gereken tutar (TL)
+    requiredMonthlyContribution: t.float(),
+    /// Kullanıcının davranışsal kapasitesinden önerilen tutar (TL)
+    suggestedMonthlyContribution: t.float(),
+    /// required - suggested farkı (pozitifse açık var demek)
+    monthlyGap: t.float(),
+    /// Mevcut hızla hedefe ne kadar ay kaldığı. Katkı 0/Infinity ise null.
+    projectedMonthsToGoal: t.float({ nullable: true }),
+    /// Hedef tarihine kalan ay sayısı
+    targetMonthsRemaining: t.int(),
+    /// Gerçekçilik seviyesi (UI'da renkli badge)
+    level: t.field({ type: GoalPlanLevelRef }),
+    /// Insan-okur özet (fallback metni; AI summary planSummary alanında ayrı)
+    summary: t.string(),
+  }),
+});
 
 const GoalRef = builder.prismaObject('Goal', {
   fields: (t) => ({
@@ -31,8 +69,27 @@ const GoalRef = builder.prismaObject('Goal', {
       resolve: (g) => Number(g.monthlyContribution),
     }),
     status: t.expose('status', { type: GoalStatusRef }),
-    priceHistory: t.expose('priceHistory', { type: 'JSON', nullable: true }),
+    priceHistory: t.field({
+      type: 'JSON',
+      nullable: true,
+      resolve: async (goal, _args, ctx) => {
+        const rows = await ctx.prisma.goalPriceHistory.findMany({
+          where: { goalId: goal.id },
+          orderBy: { checkedAt: 'asc' },
+          select: { checkedAt: true, price: true },
+        });
+        if (rows.length > 0) {
+          return rows.map((row) => ({
+            date: row.checkedAt.toISOString().slice(0, 10),
+            price: moneyToNumber(row.price),
+          }));
+        }
+        return goal.priceHistory;
+      },
+    }),
     coachContext: t.exposeString('coachContext', { nullable: true }),
+    planSummary: t.exposeString('planSummary', { nullable: true }),
+    planGeneratedAt: t.expose('planGeneratedAt', { type: 'DateTime', nullable: true }),
     autoUpdate: t.exposeBoolean('autoUpdate'),
 
     rawQuery: t.exposeString('rawQuery', { nullable: true }),
@@ -44,16 +101,116 @@ const GoalRef = builder.prismaObject('Goal', {
     productSource: t.exposeString('productSource', { nullable: true }),
     currency: t.exposeString('currency'),
     lastCheckedAt: t.expose('lastCheckedAt', { type: 'DateTime', nullable: true }),
+    nextPriceCheckAt: t.expose('nextPriceCheckAt', { type: 'DateTime', nullable: true }),
     trackedProgress: t.float({
-      resolve: (goal) => calculateProgress(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
+      resolve: (goal) =>
+        calculateProgress(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
     }),
     trackedRemainingAmount: t.float({
-      resolve: (goal) => calculateRemainingAmount(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
+      resolve: (goal) =>
+        calculateRemainingAmount(moneyToNumber(goal.current), moneyToNumber(goal.currentPrice)),
+    }),
+
+    /// Mevcut tasarruf hızıyla hedefe ETA + gerçekçilik (ON_TRACK/STRETCH/AT_RISK).
+    /// Resolver son 30 günün opportunity + accepted contributions verisini çekip
+    /// pure `buildGoalSavingsPlan` çağırır. DB'ye yazılmaz, her query'de fresh.
+    savingsPlan: t.field({
+      type: GoalSavingsPlanType,
+      resolve: async (goal, _args, ctx) => {
+        const since30 = new Date();
+        since30.setDate(since30.getDate() - 30);
+        const [user, txs, contribs] = await Promise.all([
+          ctx.prisma.user.findUniqueOrThrow({
+            where: { id: goal.userId },
+            select: { monthlyIncome: true },
+          }),
+          ctx.prisma.transaction.findMany({
+            where: { userId: goal.userId, occurredAt: { gte: since30 } },
+            select: { opportunity: true },
+          }),
+          ctx.prisma.microContribution.findMany({
+            where: {
+              userId: goal.userId,
+              status: { not: 'REVERSED' },
+              createdAt: { gte: since30 },
+            },
+            select: { amount: true },
+          }),
+        ]);
+        const last30dOpportunity = txs.reduce(
+          (s, t) => s + (t.opportunity != null ? Number(t.opportunity) : 0),
+          0,
+        );
+        const acceptedContributionsLast30d = contribs.reduce((s, c) => s + Number(c.amount), 0);
+
+        const plan = buildGoalSavingsPlan({
+          targetPrice: Number(goal.currentPrice),
+          currentAmount: Number(goal.current),
+          targetDate: goal.targetDate,
+          monthlyIncome: Number(user.monthlyIncome),
+          last30dOpportunity,
+          acceptedContributionsLast30d,
+          now: ctx.now(),
+        });
+
+        return {
+          requiredMonthlyContribution: plan.requiredMonthlyContribution,
+          suggestedMonthlyContribution: plan.suggestedMonthlyContribution,
+          monthlyGap: plan.monthlyGap,
+          // Infinity → null (GraphQL Float Infinity destek vermez, frontend null'ı handle eder)
+          projectedMonthsToGoal: Number.isFinite(plan.projectedMonthsToGoal)
+            ? plan.projectedMonthsToGoal
+            : null,
+          targetMonthsRemaining: plan.targetMonthsRemaining,
+          level: plan.level,
+          summary: plan.summary,
+        };
+      },
+    }),
+
+    /// Bu hedefe yapılan MicroContribution'ların son N ayda kümülatif birikim noktaları.
+    /// REVERSED hariç. Pure logic (packages/core) — her query'de fresh hesap, DB persist yok.
+    contributionTimeline: t.field({
+      type: [ContributionTimelinePointType],
+      args: {
+        monthsBack: t.arg.int({ defaultValue: 6 }),
+      },
+      resolve: async (goal, args, ctx) => {
+        const monthsBack = args.monthsBack ?? 6;
+        const contribs = await ctx.prisma.microContribution.findMany({
+          where: {
+            userId: goal.userId,
+            goalId: goal.id,
+            status: { not: 'REVERSED' },
+          },
+          select: { amount: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        return buildContributionTimeline({
+          contributions: contribs.map((c) => ({
+            amount: Number(c.amount),
+            createdAt: c.createdAt,
+          })),
+          monthsBack,
+          now: ctx.now(),
+        });
+      },
     }),
 
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     checkpoints: t.relation('checkpoints'),
+  }),
+});
+
+const ContributionTimelinePointType = builder.simpleObject('ContributionTimelinePoint', {
+  description:
+    'Hedef ilerleme grafiği için bir ay noktası. periodStart = YYYY-MM-01, ' +
+    'periodAmount = o ay eklenen, cumulativeAmount = window başından bu ay sonuna toplam birikim.',
+  fields: (t) => ({
+    periodStart: t.string(),
+    periodAmount: t.float(),
+    cumulativeAmount: t.float(),
   }),
 });
 
@@ -112,6 +269,17 @@ const PriceRefreshResultObject = builder.simpleObject('GoalPriceRefreshResult', 
   }),
 });
 
+const InflationRateObject = builder.simpleObject('InflationRate', {
+  fields: (t) => ({
+    annualRate: t.float(),
+    monthlyRate: t.float({ nullable: true }),
+    period: t.string(),
+    publishedAt: t.field({ type: 'DateTime' }),
+    source: t.string(),
+    sourceUrl: t.string(),
+  }),
+});
+
 // Queries
 builder.queryField('goals', (t) =>
   t.prismaField({
@@ -153,6 +321,21 @@ builder.queryField('goalPriceAlerts', (t) =>
   }),
 );
 
+builder.queryField('latestInflationRate', (t) =>
+  t.field({
+    type: InflationRateObject,
+    nullable: true,
+    authScopes: { authenticated: true },
+    resolve: async () => {
+      try {
+        return await fetchLatestTuikInflationRate();
+      } catch {
+        return null;
+      }
+    },
+  }),
+);
+
 // Mutations
 const GoalTrackingInputType = builder.inputType('GoalTrackingInput', {
   fields: (t) => ({
@@ -173,7 +356,7 @@ const GoalInputType = builder.inputType('GoalInput', {
     name: t.string({ required: true }),
     basePrice: t.float({ required: true }),
     targetDate: t.field({ type: 'DateTime', required: true }),
-    inflationPct: t.float({ defaultValue: 32 }),
+    inflationPct: t.float(),
     monthlyContribution: t.float({ defaultValue: 0 }),
     tracking: t.field({ type: GoalTrackingInputType }),
   }),
@@ -187,6 +370,29 @@ builder.mutationField('createGoal', (t) =>
     resolve: async (query, _root, args, ctx) => {
       const input = args.input;
       const tracking = input.tracking ? CreateGoalTrackingInputSchema.parse(input.tracking) : null;
+      const now = ctx.now();
+      const targetPrice = tracking?.price ?? input.basePrice;
+      const inflationRate =
+        input.inflationPct ?? (await fetchLatestTuikInflationRate())?.annualRate ?? 32;
+      const stats = await getGoalPlanStats(ctx);
+      const plan = buildGoalSavingsPlan({
+        targetPrice,
+        currentAmount: 0,
+        targetDate: input.targetDate,
+        monthlyIncome: stats.monthlyIncome,
+        last30dOpportunity: stats.last30dOpportunity,
+        acceptedContributionsLast30d: stats.acceptedContributionsLast30d,
+        now,
+      });
+      const aiSummary =
+        (await ctx.goalPlanNarrator.summarizeGoalPlan({
+          goalName: input.name,
+          targetPrice,
+          monthlyIncome: stats.monthlyIncome,
+          last30dOpportunity: stats.last30dOpportunity,
+          acceptedContributionsLast30d: stats.acceptedContributionsLast30d,
+          plan,
+        })) ?? plan.summary;
 
       const goal = await ctx.prisma.goal.create({
         ...query,
@@ -194,11 +400,11 @@ builder.mutationField('createGoal', (t) =>
           userId: ctx.userId!,
           name: input.name,
           basePrice: input.basePrice,
-          currentPrice: tracking?.price ?? input.basePrice,
-          inflationPct: input.inflationPct ?? 32,
+          currentPrice: targetPrice,
+          inflationPct: inflationRate,
           targetDate: input.targetDate,
           current: 0,
-          monthlyContribution: input.monthlyContribution ?? 0,
+          monthlyContribution: plan.suggestedMonthlyContribution,
           status: 'ACTIVE',
           autoUpdate: true,
           rawQuery: tracking?.rawQuery ?? null,
@@ -209,7 +415,10 @@ builder.mutationField('createGoal', (t) =>
           productImage: tracking?.productImage ?? null,
           productSource: tracking?.productSource ?? null,
           currency: tracking?.currency ?? 'TRY',
-          lastCheckedAt: tracking ? new Date() : null,
+          lastCheckedAt: tracking ? now : null,
+          nextPriceCheckAt: tracking ? calculateNextPriceCheckAt(input.targetDate, now) : null,
+          planSummary: aiSummary,
+          planGeneratedAt: now,
         },
       });
 
@@ -217,7 +426,14 @@ builder.mutationField('createGoal', (t) =>
         data: [10, 25, 50, 75].map((pct) => ({
           goalId: goal.id,
           percent: pct,
-          label: pct === 10 ? 'İlk %10' : pct === 25 ? 'Çeyrek yol' : pct === 50 ? 'Yarı yol' : 'Son düzlük',
+          label:
+            pct === 10
+              ? 'İlk %10'
+              : pct === 25
+                ? 'Çeyrek yol'
+                : pct === 50
+                  ? 'Yarı yol'
+                  : 'Son düzlük',
         })),
       });
 
@@ -225,18 +441,54 @@ builder.mutationField('createGoal', (t) =>
         await ctx.prisma.goalPriceHistory.create({
           data: {
             goalId: goal.id,
-            checkedAt: new Date(),
+            checkedAt: now,
             price: tracking.price,
             currency: tracking.currency,
             source: tracking.productSource,
           },
         });
       }
+      await recomputeAndPersistFutureScore(ctx, ctx.userId!, 'GOAL_CHANGED');
 
       return goal;
     },
   }),
 );
+
+async function getGoalPlanStats(ctx: GraphQLContext) {
+  const since30 = new Date(ctx.now());
+  since30.setDate(since30.getDate() - 30);
+  const [user, transactions, contributions] = await Promise.all([
+    ctx.prisma.user.findUniqueOrThrow({
+      where: { id: ctx.userId! },
+      select: { monthlyIncome: true },
+    }),
+    ctx.prisma.transaction.findMany({
+      where: { userId: ctx.userId!, occurredAt: { gte: since30 } },
+      select: { opportunity: true },
+    }),
+    ctx.prisma.microContribution.findMany({
+      where: {
+        userId: ctx.userId!,
+        createdAt: { gte: since30 },
+        status: { not: 'REVERSED' },
+      },
+      select: { amount: true },
+    }),
+  ]);
+
+  return {
+    monthlyIncome: moneyToNumber(user.monthlyIncome),
+    last30dOpportunity: transactions.reduce(
+      (sum, tx) => sum + (tx.opportunity != null ? moneyToNumber(tx.opportunity) : 0),
+      0,
+    ),
+    acceptedContributionsLast30d: contributions.reduce(
+      (sum, contribution) => sum + moneyToNumber(contribution.amount),
+      0,
+    ),
+  };
+}
 
 const GoalUpdateInputType = builder.inputType('GoalUpdateInput', {
   fields: (t) => ({
@@ -269,15 +521,20 @@ builder.mutationField('updateGoal', (t) =>
       if (input.monthlyContribution !== undefined && input.monthlyContribution !== null) {
         data.monthlyContribution = input.monthlyContribution;
       }
-      if (input.inflationPct !== undefined && input.inflationPct !== null) data.inflationPct = input.inflationPct;
-      if (input.autoUpdate !== undefined && input.autoUpdate !== null) data.autoUpdate = input.autoUpdate;
-      if (input.coachContext !== undefined && input.coachContext !== null) data.coachContext = input.coachContext;
+      if (input.inflationPct !== undefined && input.inflationPct !== null)
+        data.inflationPct = input.inflationPct;
+      if (input.autoUpdate !== undefined && input.autoUpdate !== null)
+        data.autoUpdate = input.autoUpdate;
+      if (input.coachContext !== undefined && input.coachContext !== null)
+        data.coachContext = input.coachContext;
 
-      return ctx.prisma.goal.update({
+      const updatedGoal = await ctx.prisma.goal.update({
         ...query,
         where: { id: String(args.id) },
         data,
       });
+      await recomputeAndPersistFutureScore(ctx, ctx.userId!, 'GOAL_CHANGED');
+      return updatedGoal;
     },
   }),
 );

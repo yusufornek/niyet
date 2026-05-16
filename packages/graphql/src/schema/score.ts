@@ -1,7 +1,8 @@
 /**
- * FutureScoreSnapshot tipi + futureScore query.
+ * FutureScoreSnapshot + score insight query'leri.
  */
 import { builder } from '../builder';
+import { ensureFutureScore, getFutureScoreInsights } from '../score/service';
 
 builder.prismaObject('FutureScoreSnapshot', {
   fields: (t) => ({
@@ -15,6 +16,50 @@ builder.prismaObject('FutureScoreSnapshot', {
   }),
 });
 
+const FutureScoreSnapshotLite = builder.simpleObject('FutureScoreSnapshotLite', {
+  fields: (t) => ({
+    id: t.id(),
+    score: t.int(),
+    contribution: t.int(),
+    discipline: t.int(),
+    consistency: t.int(),
+    social: t.int(),
+    computedAt: t.field({ type: 'DateTime' }),
+  }),
+});
+
+const ScoreDriverDirectionRef = builder.enumType('ScoreDriverDirection', {
+  values: ['UP', 'DOWN', 'FLAT'] as const,
+});
+
+const FutureScoreDriver = builder.simpleObject('FutureScoreDriver', {
+  fields: (t) => ({
+    metric: t.string(),
+    delta: t.int(),
+    direction: t.field({ type: ScoreDriverDirectionRef }),
+  }),
+});
+
+const UserBadge = builder.simpleObject('UserBadge', {
+  fields: (t) => ({
+    key: t.string(),
+    title: t.string(),
+    unlockedAt: t.field({ type: 'DateTime' }),
+  }),
+});
+
+const FutureScoreInsights = builder.simpleObject('FutureScoreInsights', {
+  fields: (t) => ({
+    current: t.field({ type: FutureScoreSnapshotLite, nullable: true }),
+    previous: t.field({ type: FutureScoreSnapshotLite, nullable: true }),
+    delta: t.int(),
+    label: t.string(),
+    status: t.string(),
+    topDriver: t.field({ type: FutureScoreDriver }),
+    badges: t.field({ type: [UserBadge] }),
+  }),
+});
+
 builder.queryField('futureScore', (t) =>
   t.prismaField({
     type: 'FutureScoreSnapshot',
@@ -22,9 +67,11 @@ builder.queryField('futureScore', (t) =>
     authScopes: { authenticated: true },
     description: "Kullanıcının en güncel Future Score snapshot'ı",
     resolve: async (query, _root, _args, ctx) => {
+      const userId = ctx.userId!;
+      await ensureFutureScore(ctx, userId);
       return ctx.prisma.futureScoreSnapshot.findFirst({
         ...query,
-        where: { userId: ctx.userId! },
+        where: { userId },
         orderBy: { computedAt: 'desc' },
       });
     },
@@ -43,6 +90,16 @@ builder.queryField('futureScoreHistory', (t) =>
         orderBy: { computedAt: 'desc' },
         take: args.limit ?? 10,
       });
+    },
+  }),
+);
+
+builder.queryField('futureScoreInsights', (t) =>
+  t.field({
+    type: FutureScoreInsights,
+    authScopes: { authenticated: true },
+    resolve: async (_root, _args, ctx) => {
+      return getFutureScoreInsights(ctx, ctx.userId!);
     },
   }),
 );

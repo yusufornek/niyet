@@ -86,11 +86,35 @@ export const RECOMMEND_ACTION_TOOL: FunctionDeclaration = {
   },
 };
 
+export const SIMULATE_GOAL_ACCELERATION_TOOL: FunctionDeclaration = {
+  name: 'simulate_goal_acceleration',
+  description:
+    'Belirli bir hedef için "hangi kategoriyi ne kadar kesersem hedefe kaç ay erken ulaşırım" ' +
+    'simülasyonu üret. Sonuç: top 3 kategori (en yüksek opportunity), birleşik senaryo (top 3 ' +
+    'kategoriyi birlikte kesme) ve en kolay tek kategori senaryosu. Kategori kesme oranı pratik ' +
+    'olarak %70 alınır. Kullanıcı goal context ile geldiyse (sohbete bir hedef üzerinden başladıysa) ' +
+    "her zaman bu tool'u çağır — kategori-mapping yapmadan tasarruf önerisi verme.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      goal_id: {
+        type: Type.STRING,
+        description:
+          "Simülasyonu yapılacak hedefin id'si. Kullanıcı goal sayfasından gelmişse coach " +
+          "agent'a goalId iletilir; tool çağrısında o id kullanılmalı. Bilinmiyorsa önce " +
+          '`get_goals_with_eta` ile listele.',
+      },
+    },
+    required: ['goal_id'],
+  },
+};
+
 export const COACH_TOOLS: FunctionDeclaration[] = [
   GET_DASHBOARD_SUMMARY_TOOL,
   GET_CATEGORY_BREAKDOWN_TOOL,
   GET_SUBSCRIPTIONS_TOOL,
   GET_GOALS_TOOL,
   GET_CATEGORY_TRANSACTIONS_TOOL,
+  SIMULATE_GOAL_ACCELERATION_TOOL,
   RECOMMEND_ACTION_TOOL,
 ];
