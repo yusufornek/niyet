@@ -18,3 +18,4 @@ export * from './goal-plan';
 export * from './goal-price-schedule';
 export * from './goal-progress';
 export * from './pause';
+export * from './category-auto-save';
