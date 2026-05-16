@@ -203,6 +203,12 @@ export interface GoalSavingsPlan {
   summary: string;
 }
 
+export interface ContributionTimelinePoint {
+  periodStart: string; // YYYY-MM-01
+  periodAmount: number;
+  cumulativeAmount: number;
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -231,6 +237,7 @@ export interface Goal {
   trackedProgress?: number;
   trackedRemainingAmount?: number;
   savingsPlan?: GoalSavingsPlan;
+  contributionTimeline?: ContributionTimelinePoint[];
 }
 
 export interface ProductQueryNormalization {
@@ -524,6 +531,7 @@ const GOAL_Q = `query Goal($id: ID!) {
       requiredMonthlyContribution suggestedMonthlyContribution monthlyGap
       projectedMonthsToGoal targetMonthsRemaining level summary
     }
+    contributionTimeline { periodStart periodAmount cumulativeAmount }
   }
 }`;
 const GOAL_PRICE_ALERTS_Q = `query GoalPriceAlerts($unreadOnly: Boolean) {

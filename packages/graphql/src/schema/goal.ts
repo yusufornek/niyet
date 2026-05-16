@@ -2,6 +2,7 @@
  * Goal + GoalCheckpoint + goal-tracking operations.
  */
 import {
+  buildContributionTimeline,
   buildGoalSavingsPlan,
   calculateNextPriceCheckAt,
   calculateProgress,
@@ -167,9 +168,49 @@ const GoalRef = builder.prismaObject('Goal', {
       },
     }),
 
+    /// Bu hedefe yapılan MicroContribution'ların son N ayda kümülatif birikim noktaları.
+    /// REVERSED hariç. Pure logic (packages/core) — her query'de fresh hesap, DB persist yok.
+    contributionTimeline: t.field({
+      type: [ContributionTimelinePointType],
+      args: {
+        monthsBack: t.arg.int({ defaultValue: 6 }),
+      },
+      resolve: async (goal, args, ctx) => {
+        const monthsBack = args.monthsBack ?? 6;
+        const contribs = await ctx.prisma.microContribution.findMany({
+          where: {
+            userId: goal.userId,
+            goalId: goal.id,
+            status: { not: 'REVERSED' },
+          },
+          select: { amount: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        return buildContributionTimeline({
+          contributions: contribs.map((c) => ({
+            amount: Number(c.amount),
+            createdAt: c.createdAt,
+          })),
+          monthsBack,
+          now: ctx.now(),
+        });
+      },
+    }),
+
     createdAt: t.expose('createdAt', { type: 'DateTime' }),
     updatedAt: t.expose('updatedAt', { type: 'DateTime' }),
     checkpoints: t.relation('checkpoints'),
+  }),
+});
+
+const ContributionTimelinePointType = builder.simpleObject('ContributionTimelinePoint', {
+  description:
+    'Hedef ilerleme grafiği için bir ay noktası. periodStart = YYYY-MM-01, ' +
+    'periodAmount = o ay eklenen, cumulativeAmount = window başından bu ay sonuna toplam birikim.',
+  fields: (t) => ({
+    periodStart: t.string(),
+    periodAmount: t.float(),
+    cumulativeAmount: t.float(),
   }),
 });
 
