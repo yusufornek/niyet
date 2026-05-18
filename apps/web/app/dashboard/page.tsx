@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { FinancialSnapshotCard } from '@/components/financial-snapshot-card';
 import { PhoneShell } from '@/components/phone-shell';
 import { MonthlyTargetWidget } from '@/components/monthly-target-widget';
 import { RulesWidget } from '@/components/rules-widget';
@@ -66,6 +67,14 @@ export default function DashboardPage() {
             : `Bu ay ${formatTRY(dashboard?.totalOpportunityLast30d ?? 0)} kurtarabilirsin.`}
         </h1>
       </div>
+
+      <FinancialSnapshotCard
+        opportunityLast30d={dashboard?.totalOpportunityLast30d ?? 0}
+        futureScore={score?.score ?? null}
+        scoreDelta={scoreInsight?.delta ?? 0}
+        totalAccepted={totalAccepted}
+        loading={dashLoading}
+      />
 
       {paused && (
         <div className="ny-card border-primary/30 mb-3 flex items-center gap-3">
