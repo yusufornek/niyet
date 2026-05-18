@@ -1,56 +1,54 @@
 'use client';
 
-import {
-  Bell,
-  CreditCard,
-  GraduationCap,
-  History as HistoryIcon,
-  ListChecks,
-  Newspaper,
-  Pause,
-  PiggyBank,
-  Settings,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
-import type { Route } from 'next';
+/**
+ * Dashboard — ana sayfa.
+ *
+ * Tasarım hedefi: SADE. Detay sayfalarının çoğunluğu /menu'ye taşındı; burada
+ * sadece "tek bakışta görmek istediğim özet" bilgi kalır:
+ *   - Header: Bell (okunmamış bildirim badge'i) + isim + Settings
+ *   - Hero başlık: bu ay azaltılabilir tutar
+ *   - Pause banner (conditional)
+ *   - FinancialSnapshotCard: 3 metrik (fırsat / skor / katkı)
+ *   - MonthlyTargetWidget: aylık katkı hedefi + ilerleme
+ *   - Aktif Hedef kartı (donut + Devam et CTA)
+ *
+ * Kaldırılan modüller (artık /menu üzerinden):
+ *   - ScoreCard büyük kart (snapshot'ta skor zaten var, detay /score)
+ *   - SavingsProjectionWidget (detay /impact)
+ *   - "Niyet etkim" link (menüde Analiz altında)
+ *   - 2-col grid (Fırsat / Önerilen katkı) — snapshot kapsar
+ *   - Mikro Emeklilik / AI Analiz / Abonelikler / Goal / Rules link kartları
+ *   - 3x3 hızlı erişim grid (menüde tümü)
+ *   - Demo özetini gör butonu (menüde Hızlı Erişim'de)
+ */
+import { Bell, Pause, Settings } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
 
 import { FinancialSnapshotCard } from '@/components/financial-snapshot-card';
-import { PhoneShell } from '@/components/phone-shell';
 import { MonthlyTargetWidget } from '@/components/monthly-target-widget';
-import { RulesWidget } from '@/components/rules-widget';
-import { SavingsProjectionWidget } from '@/components/savings-projection-widget';
-import { ScoreCard } from '@/components/score-card';
+import { PhoneShell } from '@/components/phone-shell';
 import {
   useDashboard,
   useFutureScoreInsights,
   useGoals,
   useMe,
   useNotifications,
-  useSubscriptionSummary,
 } from '@/lib/graphql/queries';
 import { formatTRY } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const router = useRouter();
-
   const { data: me } = useMe();
   const pauseStatus = me?.me?.pauseStatus;
   const paused = pauseStatus?.isPaused ?? false;
   const { data: dash, isLoading: dashLoading } = useDashboard();
   const { data: goalsData } = useGoals();
   const { data: scoreData } = useFutureScoreInsights();
-  const { data: subData } = useSubscriptionSummary();
 
   const userName = me?.me?.name?.split(' ')[0] ?? '';
   const goal = goalsData?.goals[0];
   const dashboard = dash?.dashboard;
   const score = scoreData?.futureScoreInsights?.current;
   const scoreInsight = scoreData?.futureScoreInsights;
-  const acceptedShown = dashboard?.acceptedContributionsLast30d ?? 0;
   const totalAccepted = dashboard?.totalAcceptedContributions ?? 0;
 
   return (
@@ -94,207 +92,105 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <ScoreCard
-        score={score?.score ?? 0}
-        delta={scoreInsight?.delta ?? 0}
-        title={scoreInsight?.label ?? 'İyi gidiyorsun'}
-        subtitle="Üzerine gel — genel istatistiklerini gör."
-        status={scoreInsight?.status ?? 'Sağlıklı finansal ritim'}
-        onOpen={() => router.push('/score')}
-        stats={[
-          {
-            label: 'Kabul edilen tasarruf',
-            value: formatTRY(acceptedShown),
-            foot: 'son 30 gün',
-          },
-          {
-            label: 'Aktif kural',
-            value: `${dashboard?.activeRulesCount ?? 0}`,
-            foot: 'otomatik katkı',
-          },
-          {
-            label: 'Hedef ilerleme',
-            value: goal ? `${Math.round((goal.current / goal.currentPrice) * 100)}%` : '—',
-            foot: goal?.name ?? 'hedef yok',
-          },
-          {
-            label: 'Bu ay fırsat',
-            value: formatTRY(dashboard?.totalOpportunityLast30d ?? 0),
-            foot: 'azaltılabilir',
-          },
-        ]}
-      />
-
-      <div className="mb-3">
-        <SavingsProjectionWidget />
-      </div>
-
       <MonthlyTargetWidget />
 
-      <Link
-        href={'/impact' as Route}
-        className="ny-card mb-3 block !p-3 text-left"
-        aria-label="Niyet etkimi gör"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex-1">
-            <div className="ny-eyebrow">Niyet etkim</div>
-            <div className="mt-1 text-sm font-semibold">
-              Toplam katkım, skor artışım ve potansiyelim
-            </div>
-          </div>
-          <span className="text-primary text-xs">→</span>
-        </div>
-      </Link>
+      {goal && <ActiveGoalCard goal={goal} />}
 
-      <div className="mb-3 grid grid-cols-2 gap-3">
-        <Link href="/radar" className="ny-card text-left">
-          <div className="ny-eyebrow">Fırsat</div>
-          <div className="mt-1 text-2xl font-semibold">
-            {formatTRY(dashboard?.totalOpportunityLast30d ?? 0)}
-          </div>
-          <div className="mt-1 text-xs opacity-60">azaltılabilir harcama</div>
-        </Link>
-        <Link href="/rule" className="ny-card text-left">
-          <div className="ny-eyebrow">Önerilen katkı</div>
-          <div className="text-primary mt-1 text-2xl font-semibold">
-            {formatTRY(Math.round((dashboard?.totalOpportunityLast30d ?? 0) * 0.3))}
-          </div>
-          <div className="mt-1 text-xs opacity-60">bu ay</div>
-        </Link>
-      </div>
-
-      <Link href="/contributions" className="ny-card mb-3 block w-full text-left">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <div className="ny-eyebrow">Mikro emeklilik katkıları</div>
-            {totalAccepted > 0 ? (
-              <>
-                <div className="text-primary mt-1 text-xl font-semibold">
-                  {formatTRY(totalAccepted)}
-                </div>
-                <div className="text-xs opacity-60">
-                  toplam aktarıldı · son 30 gün {formatTRY(acceptedShown)}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="mt-1 text-sm font-semibold">İlk katkını yap</div>
-                <div className="text-xs opacity-60">
-                  Tasarruf Radarı&apos;ndan azaltılabilir bir harcamayı emekliliğine aktar
-                </div>
-              </>
-            )}
-          </div>
-          <div className="text-2xl">💰</div>
-        </div>
-      </Link>
-
-      <Link href="/history" className="ny-card mb-3 block w-full text-left">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="ny-eyebrow">AI Analiz Geçmişi</div>
-            <div className="mt-1 text-sm font-semibold">Tasarruf fırsatlarını incele</div>
-            <div className="text-xs opacity-60">Trend, kategori grup ve karar geçmişi</div>
-          </div>
-          <div className="text-2xl">📈</div>
-        </div>
-      </Link>
-
-      {(subData?.subscriptionSummary?.activeCount ?? 0) > 0 && (
-        <Link href="/subscriptions" className="ny-card mb-3 block w-full text-left">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="ny-eyebrow">Aboneliklerin</div>
-              <div className="mt-1 text-xl font-semibold">
-                {formatTRY(subData?.subscriptionSummary?.activeMonthlyTotal ?? 0)}
-                <span className="text-sm opacity-60"> /ay</span>
-              </div>
-              <div className="text-xs opacity-60">
-                {subData?.subscriptionSummary?.activeCount} aktif
-                {(subData?.subscriptionSummary?.cancellableCount ?? 0) > 0 && (
-                  <>
-                    {' · '}
-                    <span className="text-primary font-semibold">
-                      {subData?.subscriptionSummary?.cancellableCount} iptal adayı (yıllık +
-                      {formatTRY(subData?.subscriptionSummary?.potentialYearlySavings ?? 0)})
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="text-2xl">📺</div>
-          </div>
-        </Link>
-      )}
-
-      {goal && (
-        <Link href="/goals" className="ny-card mb-3 block w-full text-left">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="ny-eyebrow">Aktif hedef</div>
-              <div className="mt-1 font-semibold">{goal.name}</div>
-            </div>
-            <div className="text-sm opacity-60">
-              {Math.round((goal.current / goal.currentPrice) * 100)}%
-            </div>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[hsl(var(--divider-soft))]">
-            <div
-              className="bg-primary h-full"
-              style={{ width: `${(goal.current / goal.currentPrice) * 100}%` }}
-            />
-          </div>
-          <div className="mt-2 text-xs opacity-60">
-            {formatTRY(goal.current)} / {formatTRY(goal.currentPrice)}
-          </div>
-        </Link>
-      )}
-
-      <div className="mb-3">
-        <RulesWidget />
-      </div>
-
-      <div className="ny-eyebrow mb-2 mt-5">Hızlı erişim</div>
-      <div className="mb-3 grid grid-cols-3 gap-3">
-        <QuickTile icon={<PiggyBank size={18} />} label="Katkılar" href="/contributions" />
-        <QuickTile icon={<ListChecks size={18} />} label="İşlemler" href="/transactions" />
-        <QuickTile icon={<HistoryIcon size={18} />} label="Analizler" href="/history" />
-        <QuickTile icon={<CreditCard size={18} />} label="Abonelik" href="/subscriptions" />
-        <QuickTile icon={<Users size={18} />} label="Çemberler" href="/circles" />
-        <QuickTile icon={<Pause size={18} />} label="Nefes ayı" href="/pause" />
-        <QuickTile icon={<GraduationCap size={18} />} label="Öğren" href="/learn" />
-        <QuickTile icon={<Newspaper size={18} />} label="Haberler" href="/news" />
-        <QuickTile icon={<TrendingUp size={18} />} label="Fonlar" href="/funds" />
-      </div>
-
-      <div className="ny-card mb-3">
-        <div className="ny-eyebrow">Son 30 gün</div>
-        <div className="mt-2 text-sm">
-          {dashboard?.txCountLast30d ?? 0} işlem · Toplam{' '}
-          <span className="font-semibold">{formatTRY(dashboard?.totalSpentLast30d ?? 0)}</span>
-        </div>
-      </div>
-
-      <Link href="/demo-result" className="ny-pill-ghost block w-full text-center">
-        Demo özetini gör
-      </Link>
+      <p className="mt-5 text-center text-[11px] opacity-50">
+        Daha fazlası için alttaki <b>Menü</b> sekmesine bak.
+      </p>
     </PhoneShell>
   );
 }
 
-function QuickTile({ icon, label, href }: { icon: ReactNode; label: string; href: Route }) {
+/**
+ * Aktif Hedef kompakt kart — donut + ad + tutarlar + Detay link.
+ * Mevcut hedef detay sayfasına yönlendirir.
+ */
+function ActiveGoalCard({
+  goal,
+}: {
+  goal: {
+    id: string;
+    name: string;
+    current: number;
+    currentPrice: number;
+    monthlyContribution: number;
+    targetDate: string;
+  };
+}) {
+  const pct = Math.min(100, (goal.current / goal.currentPrice) * 100);
+  const remaining = Math.max(0, goal.currentPrice - goal.current);
+  const monthsToGoal =
+    goal.monthlyContribution > 0 ? Math.ceil(remaining / goal.monthlyContribution) : null;
   return (
-    <Link href={href} className="ny-card flex flex-col items-center gap-2 !p-3 text-center">
-      <span className="text-primary">{icon}</span>
-      <span className="text-xs font-medium">{label}</span>
+    <Link href={`/goals/${goal.id}`} className="ny-card mb-3 block !p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="ny-eyebrow">Aktif hedef</div>
+        <span className="rounded-full bg-[hsl(var(--divider-soft))] px-2 py-0.5 text-[10px] font-semibold opacity-70">
+          {new Date(goal.targetDate).getFullYear()}
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        <GoalMiniDonut pct={pct} />
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-semibold leading-tight">{goal.name}</div>
+          <div className="mt-1 text-[11px] opacity-70">
+            {formatTRY(goal.current)}{' '}
+            <span className="opacity-50">/ {formatTRY(goal.currentPrice)}</span>
+          </div>
+          {monthsToGoal != null && monthsToGoal < 999 && (
+            <div className="mt-0.5 text-[10px] opacity-50">~{monthsToGoal} ay kaldı</div>
+          )}
+        </div>
+        <span className="text-primary text-xs">→</span>
+      </div>
     </Link>
+  );
+}
+
+function GoalMiniDonut({ pct }: { pct: number }) {
+  const R = 32;
+  const STROKE = 8;
+  const C = 2 * Math.PI * R;
+  const safePct = Math.max(0, Math.min(100, pct));
+  const dash = (safePct / 100) * C;
+  const gap = C - dash;
+  const color = pct >= 70 ? '#059669' : pct >= 30 ? '#d97706' : '#0284c7';
+  return (
+    <div className="relative h-[80px] w-[80px] shrink-0">
+      <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
+        <circle
+          cx="40"
+          cy="40"
+          r={R}
+          fill="none"
+          stroke="hsl(var(--divider-soft))"
+          strokeWidth={STROKE}
+        />
+        <circle
+          cx="40"
+          cy="40"
+          r={R}
+          fill="none"
+          stroke={color}
+          strokeWidth={STROKE}
+          strokeDasharray={`${dash} ${gap}`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div
+        className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-bold"
+        style={{ color }}
+      >
+        %{Math.round(safePct)}
+      </div>
+    </div>
   );
 }
 
 /**
  * Dashboard üst-sol bildirim zili — okunmamış varsa kırmızı badge sayısı.
- * Tab bar'dan "Bildirim" sekmesi kaldırıldığı için hızlı erişim noktası.
  */
 function NotificationBell() {
   const { data: notifData } = useNotifications(true);
