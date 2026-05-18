@@ -217,97 +217,24 @@ export function RadarContent({ inlineAnalyzeButton = true }: Props) {
           <CategorySpendingAlertWidget />
           <CategoryAutoSaveWidget />
 
-          <div className="ny-eyebrow mb-2">Kategoriler</div>
-          <div className="space-y-2">
-            {rows.map((c) => {
-              const meta = CATEGORY_META[c.category];
-              const isAcc = acceptedCategories[c.category];
-              const pct = totalSpent > 0 ? (c.total / totalSpent) * 100 : 0;
-              const oppPct = c.total > 0 ? (c.opportunity / c.total) * 100 : 0;
-              const reducible = c.opportunity > 0;
-              return (
-                <div
-                  key={c.category}
-                  className={`ny-card !p-3 transition-all ${
-                    hoverId === c.category ? 'ring-primary/40 ring-2' : ''
-                  }`}
-                  onMouseEnter={() => setHoverId(c.category)}
-                  onMouseLeave={() => setHoverId(null)}
-                >
-                  <button className="w-full" onClick={() => router.push(`/category/${c.category}`)}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{meta?.icon}</span>
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold">{meta?.label}</span>
-                          <span className="text-xs opacity-60">{formatTRY(c.total)}</span>
-                        </div>
-                        <div className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-[hsl(var(--divider-soft))]">
-                          <div
-                            className="h-full"
-                            style={{ width: `${pct}%`, background: meta?.color }}
-                          />
-                          {reducible && (
-                            <div
-                              className="bg-primary/80 absolute top-0 h-full"
-                              style={{
-                                left: `${pct - (pct * oppPct) / 100}%`,
-                                width: `${(pct * oppPct) / 100}%`,
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="mt-1 flex justify-between text-[10px]">
-                          <span className="opacity-50">
-                            %{Math.round(pct)} pay · {c.count} işlem
-                          </span>
-                          {reducible ? (
-                            <span className="text-primary font-semibold">
-                              +{formatTRY(c.opportunity)}
-                            </span>
-                          ) : (
-                            <span className="opacity-50">Azaltılamaz</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                  {reducible && (
-                    <div className="mt-2 flex gap-2 pl-9">
-                      <button
-                        disabled={isAcc || acceptCategoryContribution.isPending}
-                        onClick={() => {
-                          acceptCategoryContribution.mutate(
-                            { category: c.category },
-                            {
-                              onSuccess: () =>
-                                setAcceptedCategories((a) => ({ ...a, [c.category]: true })),
-                            },
-                          );
-                        }}
-                        className="ny-pill-sm flex-1 !py-1.5 !text-xs disabled:opacity-50"
-                      >
-                        {isAcc ? (
-                          <span className="flex items-center justify-center gap-1">
-                            <Check size={12} /> Aktarıldı
-                          </span>
-                        ) : (
-                          'Katkıya dönüştür'
-                        )}
-                      </button>
-                      <button
-                        onClick={() => router.push(`/category/${c.category}`)}
-                        className="ny-chip !py-1 text-[11px]"
-                      >
-                        Detay
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
+          <div className="ny-eyebrow mb-2">Kategori seç</div>
+          <CategoryPicker
+            rows={rows}
+            totalSpent={totalSpent}
+            selectedId={hoverId}
+            onSelect={setHoverId}
+            acceptedCategories={acceptedCategories}
+            onAccept={(category) =>
+              acceptCategoryContribution.mutate(
+                { category },
+                {
+                  onSuccess: () => setAcceptedCategories((a) => ({ ...a, [category]: true })),
+                },
+              )
+            }
+            acceptPending={acceptCategoryContribution.isPending}
+            onOpenDetail={(category) => router.push(`/category/${category}`)}
+          />
           <div className="mt-5 grid grid-cols-2 gap-3">
             <Link href="/contributions" className="ny-pill-ghost text-center text-sm">
               Katkılarım →
@@ -319,5 +246,179 @@ export function RadarContent({ inlineAnalyzeButton = true }: Props) {
         </>
       )}
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// CategoryPicker — dropdown + secilen kategorinin detay karti
+// (Eski uzun kategori listesinin yerine — kullanici geri bildirimi 2026-05-19)
+// ─────────────────────────────────────────────────────────────
+
+interface CategoryRow {
+  category: SpendingCategory;
+  total: number;
+  opportunity: number;
+  count: number;
+}
+
+interface CategoryPickerProps {
+  rows: CategoryRow[];
+  totalSpent: number;
+  selectedId: string | null;
+  onSelect: (id: SpendingCategory | null) => void;
+  acceptedCategories: Record<string, boolean>;
+  onAccept: (category: SpendingCategory) => void;
+  acceptPending: boolean;
+  onOpenDetail: (category: SpendingCategory) => void;
+}
+
+function CategoryPicker({
+  rows,
+  totalSpent,
+  selectedId,
+  onSelect,
+  acceptedCategories,
+  onAccept,
+  acceptPending,
+  onOpenDetail,
+}: CategoryPickerProps) {
+  // Default seçim: en yüksek harcama kategorisi (kullanıcı seçmediyse)
+  const sortedRows = [...rows].sort((a, b) => b.total - a.total);
+  const effectiveId = selectedId ?? sortedRows[0]?.category ?? null;
+  const selected = effectiveId ? rows.find((r) => r.category === effectiveId) : null;
+
+  if (rows.length === 0) {
+    return (
+      <div className="ny-card !p-3 text-center text-xs opacity-60">
+        Henüz kategori verisi yok. AI analizi tetikleyince burada görünecek.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Native select — mobilde sistem picker kullanır */}
+      <div className="relative mb-3">
+        <select
+          value={effectiveId ?? ''}
+          onChange={(e) => onSelect(e.target.value as SpendingCategory)}
+          aria-label="Kategori seç"
+          className="w-full appearance-none rounded-xl border border-[hsl(var(--hairline))] bg-white py-3 pl-10 pr-8 text-sm font-semibold"
+        >
+          {sortedRows.map((c) => {
+            const meta = CATEGORY_META[c.category];
+            return (
+              <option key={c.category} value={c.category}>
+                {meta?.label} — {formatTRY(c.total)}
+              </option>
+            );
+          })}
+        </select>
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg">
+          {selected ? CATEGORY_META[selected.category]?.icon : '📊'}
+        </span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
+          ▼
+        </span>
+      </div>
+
+      {/* Secilen kategorinin detay karti */}
+      {selected && (
+        <CategoryDetailCard
+          row={selected}
+          totalSpent={totalSpent}
+          isAccepted={Boolean(acceptedCategories[selected.category])}
+          onAccept={() => onAccept(selected.category)}
+          acceptPending={acceptPending}
+          onOpenDetail={() => onOpenDetail(selected.category)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface DetailCardProps {
+  row: CategoryRow;
+  totalSpent: number;
+  isAccepted: boolean;
+  onAccept: () => void;
+  acceptPending: boolean;
+  onOpenDetail: () => void;
+}
+
+function CategoryDetailCard({
+  row,
+  totalSpent,
+  isAccepted,
+  onAccept,
+  acceptPending,
+  onOpenDetail,
+}: DetailCardProps) {
+  const meta = CATEGORY_META[row.category];
+  const pct = totalSpent > 0 ? (row.total / totalSpent) * 100 : 0;
+  const oppPct = row.total > 0 ? (row.opportunity / row.total) * 100 : 0;
+  const reducible = row.opportunity > 0;
+
+  return (
+    <div className="ny-card !p-4">
+      <div className="mb-3 flex items-start gap-3">
+        <span className="text-3xl">{meta?.icon}</span>
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-semibold leading-tight">{meta?.label}</div>
+          <div className="mt-1 text-[11px] opacity-60">{row.count} işlem · son 30 gün</div>
+        </div>
+        <div className="text-right">
+          <div className="text-base font-bold">{formatTRY(row.total)}</div>
+          <div className="text-[10px] opacity-50">%{Math.round(pct)} pay</div>
+        </div>
+      </div>
+
+      <div className="relative h-2 overflow-hidden rounded-full bg-[hsl(var(--divider-soft))]">
+        <div className="h-full" style={{ width: `${pct}%`, background: meta?.color }} />
+        {reducible && (
+          <div
+            className="bg-primary/80 absolute top-0 h-full"
+            style={{
+              left: `${pct - (pct * oppPct) / 100}%`,
+              width: `${(pct * oppPct) / 100}%`,
+            }}
+          />
+        )}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between text-xs">
+        {reducible ? (
+          <span className="text-primary font-semibold">
+            +{formatTRY(row.opportunity)} azaltılabilir
+          </span>
+        ) : (
+          <span className="opacity-50">Azaltılamaz</span>
+        )}
+        <button
+          onClick={onOpenDetail}
+          className="ny-chip !py-1 !text-[11px]"
+          aria-label="Kategori detay sayfasını aç"
+        >
+          Detay →
+        </button>
+      </div>
+
+      {reducible && (
+        <button
+          disabled={isAccepted || acceptPending}
+          onClick={onAccept}
+          className="ny-pill-sm mt-3 w-full !py-2 !text-xs disabled:opacity-50"
+          aria-label="Bu kategori fırsatını katkıya dönüştür"
+        >
+          {isAccepted ? (
+            <span className="flex items-center justify-center gap-1">
+              <Check size={12} /> Aktarıldı
+            </span>
+          ) : (
+            'Bu kategori fırsatını katkıya dönüştür'
+          )}
+        </button>
+      )}
+    </div>
   );
 }

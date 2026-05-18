@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Bell,
   CreditCard,
   GraduationCap,
   History as HistoryIcon,
@@ -28,6 +29,7 @@ import {
   useFutureScoreInsights,
   useGoals,
   useMe,
+  useNotifications,
   useSubscriptionSummary,
 } from '@/lib/graphql/queries';
 import { formatTRY } from '@/lib/utils';
@@ -53,6 +55,7 @@ export default function DashboardPage() {
 
   return (
     <PhoneShell
+      leftSlot={<NotificationBell />}
       rightSlot={
         <Link href="/settings" aria-label="Ayarlar" className="p-1">
           <Settings size={20} className="opacity-70" />
@@ -285,6 +288,29 @@ function QuickTile({ icon, label, href }: { icon: ReactNode; label: string; href
     <Link href={href} className="ny-card flex flex-col items-center gap-2 !p-3 text-center">
       <span className="text-primary">{icon}</span>
       <span className="text-xs font-medium">{label}</span>
+    </Link>
+  );
+}
+
+/**
+ * Dashboard üst-sol bildirim zili — okunmamış varsa kırmızı badge sayısı.
+ * Tab bar'dan "Bildirim" sekmesi kaldırıldığı için hızlı erişim noktası.
+ */
+function NotificationBell() {
+  const { data: notifData } = useNotifications(true);
+  const unreadCount = notifData?.notifications?.length ?? 0;
+  return (
+    <Link
+      href="/notifications"
+      aria-label={`Bildirimler${unreadCount > 0 ? ` (${unreadCount} okunmamış)` : ''}`}
+      className="relative -ml-1 rounded-full p-1.5 hover:bg-black/5"
+    >
+      <Bell size={20} className="opacity-80" />
+      {unreadCount > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
     </Link>
   );
 }
