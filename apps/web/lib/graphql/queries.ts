@@ -379,17 +379,7 @@ export interface AnalysisRunDetail extends AnalysisRunItem {
   transactionAnalyses: TransactionAnalysisDetail[];
 }
 
-export interface Circle {
-  id: string;
-  name: string;
-  target: number;
-  type: 'FAMILY' | 'COMMUNITY';
-  members: Array<{
-    id: string;
-    contribution: number;
-    user: { id: string; name: string };
-  }>;
-}
+// Circle interface — full tanım dosya sonunda (savings circles PBI bölümü).
 
 export interface LearnQuizItem {
   id: string;
@@ -611,12 +601,7 @@ const ANALYSIS_RUN_Q = `query AnalysisRun($id: ID!) {
     }
   }
 }`;
-const CIRCLES_Q = `query Circles {
-  circles {
-    id name target type
-    members { id contribution user { id name } }
-  }
-}`;
+// CIRCLES_Q — dosya sonundaki savings circles PBI bölümünde.
 const LEARN_HOME_Q = `query LearnHome($date: DateTime) {
   learnHome(date: $date) {
     packId packDate summary
@@ -818,12 +803,7 @@ export const useAnalysisRun = (id: string) =>
     enabled: !!id,
   });
 
-export const useCircles = () =>
-  useQuery({
-    queryKey: ['circles'],
-    queryFn: () => gqlFetcher<{ circles: Circle[] }, undefined>(CIRCLES_Q),
-    staleTime: 60_000,
-  });
+// useCircles — dosya sonundaki savings circles PBI bölümünde.
 
 export const useLearnHome = (date?: string | null) =>
   useQuery({
@@ -2197,5 +2177,208 @@ export function useEvaluateMyMonthlyTarget() {
       }
     },
     onError: (e: Error) => toast.error('Değerlendirme başarısız', { description: e.message }),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Savings Circles — PBI: ortak birikim çemberi (aile / topluluk)
+// ─────────────────────────────────────────────────────────────
+
+export type CircleType = 'FAMILY' | 'COMMUNITY';
+
+export interface CircleMembershipRow {
+  id: string;
+  contribution: number;
+  role: string;
+  joinedAt: string;
+  user: { id: string; name: string };
+}
+
+export interface Circle {
+  id: string;
+  name: string;
+  target: number;
+  type: CircleType;
+  isPublic: boolean;
+  inviteCode: string | null;
+  createdAt: string;
+  members?: CircleMembershipRow[];
+}
+
+export interface CircleLeaderboardEntry {
+  userId: string;
+  name: string;
+  contribution: number;
+  sharePct: number;
+  rank: number;
+}
+
+export interface CircleProgressData {
+  target: number;
+  totalContributed: number;
+  remainingAmount: number;
+  progressPct: number;
+  highestReachedMilestone: number | null;
+  nextMilestone: number | null;
+  memberCount: number;
+  leaderboard: CircleLeaderboardEntry[];
+}
+
+export interface CircleContributeResult {
+  membershipNewContribution: number;
+  microContributionId: string;
+  newMilestonesReached: number[];
+  notificationsCreated: number;
+}
+
+const CIRCLES_Q = `query Circles {
+  circles {
+    id name target type isPublic inviteCode createdAt
+    members {
+      id contribution role joinedAt
+      user { id name }
+    }
+  }
+}`;
+
+const CIRCLE_Q = `query Circle($id: ID!) {
+  circle(id: $id) {
+    id name target type isPublic inviteCode createdAt
+    members {
+      id contribution role joinedAt
+      user { id name }
+    }
+  }
+}`;
+
+const CIRCLE_PROGRESS_Q = `query CircleProgress($id: ID!) {
+  circleProgress(id: $id) {
+    target totalContributed remainingAmount progressPct
+    highestReachedMilestone nextMilestone memberCount
+    leaderboard { userId name contribution sharePct rank }
+  }
+}`;
+
+const CREATE_CIRCLE_M = `mutation CreateCircle($name: String!, $target: Float!, $type: CircleType!, $isPublic: Boolean) {
+  createCircle(name: $name, target: $target, type: $type, isPublic: $isPublic) {
+    id name target type isPublic inviteCode createdAt
+  }
+}`;
+
+const JOIN_CIRCLE_M = `mutation JoinCircleByInviteCode($code: String!) {
+  joinCircleByInviteCode(code: $code) {
+    id name target type isPublic inviteCode createdAt
+  }
+}`;
+
+const LEAVE_CIRCLE_M = `mutation LeaveCircle($id: ID!) {
+  leaveCircle(id: $id)
+}`;
+
+const CONTRIBUTE_CIRCLE_M = `mutation ContributeToCircle($circleId: ID!, $amount: Float!, $note: String) {
+  contributeToCircle(circleId: $circleId, amount: $amount, note: $note) {
+    membershipNewContribution microContributionId
+    newMilestonesReached notificationsCreated
+  }
+}`;
+
+export function useCircles() {
+  return useQuery({
+    queryKey: ['circles'],
+    queryFn: () => gqlFetcher<{ circles: Circle[] }, undefined>(CIRCLES_Q),
+    select: (d) => d.circles,
+  });
+}
+
+export function useCircle(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ['circle', id],
+    enabled: Boolean(id),
+    queryFn: () => gqlFetcher<{ circle: Circle | null }, { id: string }>(CIRCLE_Q, { id: id! }),
+    select: (d) => d.circle,
+  });
+}
+
+export function useCircleProgress(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ['circle-progress', id],
+    enabled: Boolean(id),
+    queryFn: () =>
+      gqlFetcher<{ circleProgress: CircleProgressData }, { id: string }>(CIRCLE_PROGRESS_Q, {
+        id: id!,
+      }),
+    select: (d) => d.circleProgress,
+  });
+}
+
+export function useCreateCircle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { name: string; target: number; type: CircleType; isPublic?: boolean }) =>
+      gqlFetcher<{ createCircle: Circle }, typeof vars>(CREATE_CIRCLE_M, vars),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['circles'] });
+      toast.success('Çember oluşturuldu');
+    },
+    onError: (e: Error) => toast.error('Çember oluşturulamadı', { description: e.message }),
+  });
+}
+
+export function useJoinCircleByInviteCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) =>
+      gqlFetcher<{ joinCircleByInviteCode: Circle }, { code: string }>(JOIN_CIRCLE_M, {
+        code,
+      }),
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: ['circles'] });
+      toast.success(`Çembere katıldın: ${data.joinCircleByInviteCode.name}`);
+    },
+    onError: (e: Error) => toast.error('Katılamadın', { description: e.message }),
+  });
+}
+
+export function useLeaveCircle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<{ leaveCircle: boolean }, { id: string }>(LEAVE_CIRCLE_M, { id }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['circles'] });
+      toast.success('Çemberden ayrıldın');
+    },
+    onError: (e: Error) => toast.error('Ayrılamadın', { description: e.message }),
+  });
+}
+
+export function useContributeToCircle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { circleId: string; amount: number; note?: string }) =>
+      gqlFetcher<{ contributeToCircle: CircleContributeResult }, typeof vars>(
+        CONTRIBUTE_CIRCLE_M,
+        vars,
+      ),
+    onSuccess: (data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['circle', vars.circleId] });
+      void qc.invalidateQueries({ queryKey: ['circle-progress', vars.circleId] });
+      void qc.invalidateQueries({ queryKey: ['circles'] });
+      void qc.invalidateQueries({ queryKey: ['contribution-summary'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      const milestones = data.contributeToCircle.newMilestonesReached;
+      if (milestones.length > 0) {
+        if (milestones.includes(100)) {
+          toast.success('🎉 Çember hedefe ulaştı!', {
+            description: `Beraber başardınız. Milestone bildirimi tüm üyelere gitti.`,
+          });
+        } else {
+          toast.success(`Yeni milestone: %${milestones.join(', %')}`);
+        }
+      } else {
+        toast.success('Katkı eklendi');
+      }
+    },
+    onError: (e: Error) => toast.error('Katkı yapılamadı', { description: e.message }),
   });
 }
