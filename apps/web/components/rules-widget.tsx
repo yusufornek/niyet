@@ -84,16 +84,16 @@ function CreateRuleForm({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="mb-3 rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-xs font-semibold opacity-70">Yeni kural</div>
+    <div className="ny-card mb-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="ny-eyebrow">Yeni kural</div>
         <button
           type="button"
           onClick={onClose}
           className="opacity-60 hover:opacity-100"
           aria-label="Kapat"
         >
-          <X size={16} />
+          <X size={18} />
         </button>
       </div>
 
@@ -101,26 +101,26 @@ function CreateRuleForm({ onClose }: { onClose: () => void }) {
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="Kural adı (örn. Maaş günü katkısı)"
-        className="mb-2 w-full rounded-xl border border-[hsl(var(--hairline))] bg-white p-2 text-sm"
+        className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
       />
 
-      <div className="mb-2 grid grid-cols-2 gap-2">
-        <label className="block text-xs">
-          <span className="mb-1 block opacity-60">Tutar (₺)</span>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs opacity-60">Tutar (₺)</span>
           <input
             type="number"
             value={amount}
             min={1}
             onChange={(e) => setAmount(+e.target.value)}
-            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-white p-2 text-sm"
+            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
           />
         </label>
-        <label className="block text-xs">
-          <span className="mb-1 block opacity-60">Sıklık</span>
+        <label className="block">
+          <span className="mb-1 block text-xs opacity-60">Sıklık</span>
           <select
             value={frequency}
             onChange={(e) => setFrequency(e.target.value as RuleFrequency)}
-            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-white p-2 text-sm"
+            className="w-full appearance-none rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
           >
             <option value="PAYDAY">Maaş günü</option>
             <option value="WEEKLY">Haftalık</option>
@@ -131,15 +131,15 @@ function CreateRuleForm({ onClose }: { onClose: () => void }) {
       </div>
 
       {frequency === 'PAYDAY' && (
-        <label className="mb-2 block text-xs">
-          <span className="mb-1 block opacity-60">Ayın hangi günü maaş alıyorsun?</span>
+        <label className="block">
+          <span className="mb-1 block text-xs opacity-60">Ayın hangi günü maaş alıyorsun?</span>
           <input
             type="number"
             min={1}
             max={31}
             value={payday}
             onChange={(e) => setPayday(Math.max(1, Math.min(31, +e.target.value)))}
-            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-white p-2 text-sm"
+            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
           />
         </label>
       )}
@@ -148,7 +148,7 @@ function CreateRuleForm({ onClose }: { onClose: () => void }) {
         type="button"
         onClick={handleSubmit}
         disabled={createRule.isPending || !label.trim() || amount <= 0}
-        className="ny-pill w-full text-sm disabled:opacity-50"
+        className="ny-pill w-full disabled:opacity-50"
       >
         {createRule.isPending ? 'Oluşturuluyor…' : 'Kural oluştur'}
       </button>

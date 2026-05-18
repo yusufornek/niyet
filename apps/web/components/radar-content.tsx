@@ -303,7 +303,7 @@ function CategoryPicker({
           value={effectiveId ?? ''}
           onChange={(e) => onSelect(e.target.value as SpendingCategory)}
           aria-label="Kategori seç"
-          className="w-full appearance-none rounded-xl border border-[hsl(var(--hairline))] bg-white py-3 pl-10 pr-8 text-sm font-semibold"
+          className="w-full appearance-none rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 pl-11 pr-10 text-sm font-semibold"
         >
           {sortedRows.map((c) => {
             const meta = CATEGORY_META[c.category];

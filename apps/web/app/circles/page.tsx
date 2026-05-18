@@ -128,7 +128,7 @@ function CreateForm({ pending, onCancel, onSubmit }: CreateProps) {
       <h3 className="mb-3 text-sm font-semibold">Yeni çember</h3>
       <div className="space-y-2">
         <div>
-          <label className="block text-[11px] font-semibold" htmlFor="circle-name">
+          <label className="mb-1 block text-xs opacity-60" htmlFor="circle-name">
             Ad
           </label>
           <input
@@ -137,12 +137,12 @@ function CreateForm({ pending, onCancel, onSubmit }: CreateProps) {
             onChange={(e) => setName(e.target.value)}
             maxLength={80}
             placeholder="Örn: Aile birikim çemberi"
-            className="mt-1 w-full rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1 text-sm"
+            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
             aria-label="Çember adı"
           />
         </div>
         <div>
-          <label className="block text-[11px] font-semibold" htmlFor="circle-target">
+          <label className="mb-1 block text-xs opacity-60" htmlFor="circle-target">
             Hedef (₺)
           </label>
           <input
@@ -152,19 +152,17 @@ function CreateForm({ pending, onCancel, onSubmit }: CreateProps) {
             step={100}
             value={targetInput}
             onChange={(e) => setTargetInput(e.target.value)}
-            className="mt-1 w-full rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1 text-sm"
+            className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
             aria-label="Hedef tutar"
           />
         </div>
         <div>
-          <span className="block text-[11px] font-semibold">Tür</span>
-          <div className="mt-1 grid grid-cols-2 gap-2">
+          <span className="mb-1 block text-xs opacity-60">Tür</span>
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setType('FAMILY')}
-              className={`ny-chip !py-1 text-xs ${
-                type === 'FAMILY' ? 'border-primary text-primary' : ''
-              }`}
+              className={`ny-chip ${type === 'FAMILY' ? 'border-primary text-primary' : ''}`}
               aria-label="Aile"
             >
               👨‍👩‍👧 Aile
@@ -172,26 +170,25 @@ function CreateForm({ pending, onCancel, onSubmit }: CreateProps) {
             <button
               type="button"
               onClick={() => setType('COMMUNITY')}
-              className={`ny-chip !py-1 text-xs ${
-                type === 'COMMUNITY' ? 'border-primary text-primary' : ''
-              }`}
+              className={`ny-chip ${type === 'COMMUNITY' ? 'border-primary text-primary' : ''}`}
               aria-label="Topluluk"
             >
               🌍 Topluluk
             </button>
           </div>
         </div>
-        <div className="flex gap-2 pt-1">
-          <button onClick={onCancel} className="ny-chip flex-1 !py-1 text-xs" aria-label="Vazgeç">
+        <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+          <button type="button" onClick={onCancel} className="ny-pill-ghost" aria-label="Vazgeç">
             Vazgeç
           </button>
           <button
+            type="button"
             disabled={!canSubmit || pending}
             onClick={() => onSubmit({ name: name.trim(), target, type })}
-            className="ny-pill-sm flex-1 !py-1 !text-xs disabled:opacity-50"
+            className="ny-pill flex-1 disabled:opacity-50"
             aria-label="Çember oluştur"
           >
-            {pending ? 'Oluşturuluyor…' : 'Oluştur'}
+            {pending ? 'Oluşturuluyor…' : 'Çember oluştur'}
           </button>
         </div>
       </div>
@@ -210,30 +207,33 @@ function JoinForm({ pending, onCancel, onSubmit }: JoinProps) {
   const canSubmit = code.trim().length >= 6;
 
   return (
-    <section className="ny-card mb-4 !p-4">
-      <h3 className="mb-2 text-sm font-semibold">Davet kodu ile katıl</h3>
-      <p className="mb-3 text-[11px] opacity-70">
-        Bir üye sana 8 karakterli davet kodu paylaştıysa buraya yaz.
-      </p>
+    <section className="ny-card mb-4 space-y-3">
+      <div>
+        <div className="ny-eyebrow mb-1">Davet kodu ile katıl</div>
+        <p className="text-xs opacity-60">
+          Bir üye sana 8 karakterli davet kodu paylaştıysa buraya yaz.
+        </p>
+      </div>
       <input
         value={code}
         onChange={(e) => setCode(e.target.value.toUpperCase())}
         maxLength={8}
         placeholder="ÖRN: ABCD2345"
-        className="w-full rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1.5 text-center font-mono text-sm tracking-widest"
+        className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-center font-mono text-base tracking-widest"
         aria-label="Davet kodu"
       />
-      <div className="mt-2 flex gap-2">
-        <button onClick={onCancel} className="ny-chip flex-1 !py-1 text-xs" aria-label="Vazgeç">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="button" onClick={onCancel} className="ny-pill-ghost" aria-label="Vazgeç">
           Vazgeç
         </button>
         <button
+          type="button"
           onClick={() => onSubmit(code.trim())}
           disabled={!canSubmit || pending}
-          className="ny-pill-sm flex-1 !py-1 !text-xs disabled:opacity-50"
+          className="ny-pill flex-1 disabled:opacity-50"
           aria-label="Katıl"
         >
-          {pending ? 'Katılıyor…' : 'Katıl'}
+          {pending ? 'Katılıyor…' : 'Çembere katıl'}
         </button>
       </div>
     </section>
