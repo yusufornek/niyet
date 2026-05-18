@@ -2433,3 +2433,217 @@ export function useMyImpactSummary() {
     staleTime: 30_000,
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// Bank Connection — PBI: banka/kart hesabi bagla
+// ─────────────────────────────────────────────────────────────
+
+export type SupportedBank =
+  // Kamu
+  | 'ZIRAAT'
+  | 'HALKBANK'
+  | 'VAKIFBANK'
+  // Ozel sermayeli
+  | 'AKBANK'
+  | 'GARANTI_BBVA'
+  | 'IS_BANKASI'
+  | 'YAPI_KREDI'
+  | 'TEB'
+  | 'SEKERBANK'
+  | 'ANADOLUBANK'
+  | 'FIBABANKA'
+  | 'ALTERNATIF_BANK'
+  | 'TURKISH_BANK'
+  | 'TEKSTILBANK'
+  // Yabanci
+  | 'HSBC'
+  | 'CITIBANK'
+  | 'ING_BANK'
+  | 'DENIZBANK'
+  | 'ICBC_TURKEY'
+  | 'QNB_FINANSBANK'
+  | 'BURGAN_BANK'
+  | 'ODEABANK'
+  // Katilim
+  | 'ZIRAAT_KATILIM'
+  | 'VAKIF_KATILIM'
+  | 'EMLAK_KATILIM'
+  | 'TURKIYE_FINANS'
+  | 'ALBARAKA_TURK'
+  | 'KUVEYT_TURK'
+  // Dijital
+  | 'ENPARA'
+  | 'N_KOLAY';
+
+export const SUPPORTED_BANK_LABELS: Record<SupportedBank, string> = {
+  ZIRAAT: 'Ziraat Bankası',
+  HALKBANK: 'Halkbank',
+  VAKIFBANK: 'VakıfBank',
+  AKBANK: 'Akbank',
+  GARANTI_BBVA: 'Garanti BBVA',
+  IS_BANKASI: 'Türkiye İş Bankası',
+  YAPI_KREDI: 'Yapı Kredi',
+  TEB: 'Türk Ekonomi Bankası',
+  SEKERBANK: 'Şekerbank',
+  ANADOLUBANK: 'Anadolubank',
+  FIBABANKA: 'Fibabanka',
+  ALTERNATIF_BANK: 'Alternatif Bank',
+  TURKISH_BANK: 'Turkish Bank',
+  TEKSTILBANK: 'Tekstilbank',
+  HSBC: 'HSBC Türkiye',
+  CITIBANK: 'Citibank',
+  ING_BANK: 'ING Bank Türkiye',
+  DENIZBANK: 'DenizBank',
+  ICBC_TURKEY: 'ICBC Turkey Bank',
+  QNB_FINANSBANK: 'QNB Finansbank',
+  BURGAN_BANK: 'Burgan Bank',
+  ODEABANK: 'Odeabank',
+  ZIRAAT_KATILIM: 'Ziraat Katılım',
+  VAKIF_KATILIM: 'Vakıf Katılım',
+  EMLAK_KATILIM: 'Türkiye Emlak Katılım',
+  TURKIYE_FINANS: 'Türkiye Finans',
+  ALBARAKA_TURK: 'Albaraka Türk',
+  KUVEYT_TURK: 'Kuveyt Türk',
+  ENPARA: 'Enpara.com',
+  N_KOLAY: 'N Kolay',
+};
+
+export type SupportedBankCategory = 'PUBLIC' | 'PRIVATE' | 'FOREIGN' | 'PARTICIPATION' | 'DIGITAL';
+
+export const SUPPORTED_BANK_CATEGORY: Record<SupportedBank, SupportedBankCategory> = {
+  ZIRAAT: 'PUBLIC',
+  HALKBANK: 'PUBLIC',
+  VAKIFBANK: 'PUBLIC',
+  AKBANK: 'PRIVATE',
+  GARANTI_BBVA: 'PRIVATE',
+  IS_BANKASI: 'PRIVATE',
+  YAPI_KREDI: 'PRIVATE',
+  TEB: 'PRIVATE',
+  SEKERBANK: 'PRIVATE',
+  ANADOLUBANK: 'PRIVATE',
+  FIBABANKA: 'PRIVATE',
+  ALTERNATIF_BANK: 'PRIVATE',
+  TURKISH_BANK: 'PRIVATE',
+  TEKSTILBANK: 'PRIVATE',
+  HSBC: 'FOREIGN',
+  CITIBANK: 'FOREIGN',
+  ING_BANK: 'FOREIGN',
+  DENIZBANK: 'FOREIGN',
+  ICBC_TURKEY: 'FOREIGN',
+  QNB_FINANSBANK: 'FOREIGN',
+  BURGAN_BANK: 'FOREIGN',
+  ODEABANK: 'FOREIGN',
+  ZIRAAT_KATILIM: 'PARTICIPATION',
+  VAKIF_KATILIM: 'PARTICIPATION',
+  EMLAK_KATILIM: 'PARTICIPATION',
+  TURKIYE_FINANS: 'PARTICIPATION',
+  ALBARAKA_TURK: 'PARTICIPATION',
+  KUVEYT_TURK: 'PARTICIPATION',
+  ENPARA: 'DIGITAL',
+  N_KOLAY: 'DIGITAL',
+};
+
+export const SUPPORTED_BANK_CATEGORY_LABEL: Record<SupportedBankCategory, string> = {
+  PUBLIC: 'Kamu bankaları',
+  PRIVATE: 'Özel sermayeli',
+  FOREIGN: 'Yabancı sermayeli',
+  PARTICIPATION: 'Katılım bankaları',
+  DIGITAL: 'Dijital bankalar',
+};
+
+export type AccountType = 'CREDIT_CARD' | 'DEBIT' | 'CHECKING' | 'SAVINGS';
+
+export interface BankConnectionAccount {
+  id: string;
+  type: AccountType;
+  last4: string;
+  nickname: string | null;
+  balance: number;
+}
+
+export interface BankConnectionRow {
+  id: string;
+  bankName: string;
+  connectedAt: string;
+  disconnectedAt: string | null;
+  active: boolean;
+  accounts: BankConnectionAccount[];
+}
+
+export interface ConnectBankResult {
+  bankConnectionId: string;
+  accountId: string;
+  transactionsCreated: number;
+  last4: string;
+}
+
+const MY_BANK_CONNECTIONS_Q = `query MyBankConnections {
+  myBankConnections {
+    id bankName connectedAt disconnectedAt active
+    accounts { id type last4 nickname balance }
+  }
+}`;
+
+const SUPPORTED_BANKS_Q = `query SupportedBanks {
+  supportedBanks
+}`;
+
+const CONNECT_BANK_M = `mutation ConnectBank($bankName: SupportedBank!, $accountType: AccountType, $nickname: String) {
+  connectBank(bankName: $bankName, accountType: $accountType, nickname: $nickname) {
+    bankConnectionId accountId transactionsCreated last4
+  }
+}`;
+
+const DISCONNECT_BANK_M = `mutation DisconnectBank($id: ID!) {
+  disconnectBank(id: $id)
+}`;
+
+export function useMyBankConnections() {
+  return useQuery({
+    queryKey: ['my-bank-connections'],
+    queryFn: () =>
+      gqlFetcher<{ myBankConnections: BankConnectionRow[] }, undefined>(MY_BANK_CONNECTIONS_Q),
+    select: (d) => d.myBankConnections,
+  });
+}
+
+export function useSupportedBanks() {
+  return useQuery({
+    queryKey: ['supported-banks'],
+    queryFn: () => gqlFetcher<{ supportedBanks: SupportedBank[] }, undefined>(SUPPORTED_BANKS_Q),
+    select: (d) => d.supportedBanks,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useConnectBank() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { bankName: SupportedBank; accountType?: AccountType; nickname?: string }) =>
+      gqlFetcher<{ connectBank: ConnectBankResult }, typeof vars>(CONNECT_BANK_M, vars),
+    onSuccess: (data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['my-bank-connections'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['transactions'] });
+      toast.success(`${vars.bankName} bağlandı`, {
+        description: `${data.connectBank.transactionsCreated} işlem aktarıldı · Kart sonu ${data.connectBank.last4}`,
+      });
+    },
+    onError: (e: Error) => toast.error('Bağlantı başarısız', { description: e.message }),
+  });
+}
+
+export function useDisconnectBank() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      gqlFetcher<{ disconnectBank: boolean }, { id: string }>(DISCONNECT_BANK_M, { id }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['my-bank-connections'] });
+      toast.success('Banka bağlantısı kaldırıldı', {
+        description: 'İşlem geçmişin korundu, sadece yeni veri akışı durdu.',
+      });
+    },
+    onError: (e: Error) => toast.error('Kaldırılamadı', { description: e.message }),
+  });
+}
