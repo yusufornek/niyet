@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, ChevronLeft, Home, MessageCircle, PiggyBank } from 'lucide-react';
+import { ChevronLeft, Home, LayoutGrid, MessageCircle, PiggyBank } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -15,6 +15,9 @@ type Props = {
   scroll?: boolean;
   hideTabs?: boolean;
   rightSlot?: ReactNode;
+  /// Header satirinin solunda gosterilecek custom slot — back yokken kullanilir
+  /// (orn. Dashboard'da bildirim zili). back yine onceliklidir.
+  leftSlot?: ReactNode;
 };
 
 /**
@@ -29,6 +32,7 @@ export function PhoneShell({
   scroll = true,
   hideTabs,
   rightSlot,
+  leftSlot,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -58,9 +62,9 @@ export function PhoneShell({
         </div>
 
         {/* Header */}
-        {(title || back) && (
+        {(title || back || leftSlot || rightSlot) && (
           <div className="flex items-center gap-2 px-5 pb-3 pt-2">
-            {back && (
+            {back ? (
               <button
                 onClick={() => router.back()}
                 className={cn(
@@ -71,8 +75,11 @@ export function PhoneShell({
               >
                 <ChevronLeft size={22} />
               </button>
+            ) : (
+              leftSlot
             )}
             {title && <h1 className="ny-h2 flex-1 truncate">{title}</h1>}
+            {!title && <div className="flex-1" />}
             {rightSlot}
           </div>
         )}
@@ -119,10 +126,10 @@ export function PhoneShell({
               duo={isLearnMode}
             />
             <TabBtn
-              icon={<Bell size={20} />}
-              label="Bildirim"
-              href="/notifications"
-              active={pathname === '/notifications'}
+              icon={<LayoutGrid size={20} />}
+              label="Menü"
+              href="/menu"
+              active={pathname === '/menu'}
               duo={isLearnMode}
             />
           </nav>
