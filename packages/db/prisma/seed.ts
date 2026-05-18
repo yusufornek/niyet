@@ -371,24 +371,10 @@ export async function seedDemoForUser(input: SeedDemoInput) {
     ],
   });
 
-  const targetDate2030 = new Date();
-  targetDate2030.setFullYear(targetDate2030.getFullYear() + 4);
-  const emergencyGoal = await prisma.goal.create({
-    data: {
-      userId: ayse.id,
-      name: 'Acil durum fonu',
-      basePrice: 30000,
-      currentPrice: 30000,
-      inflationPct: 28,
-      targetDate: targetDate2030,
-      current: 4500,
-      monthlyContribution: 500,
-      status: 'ACTIVE',
-      autoUpdate: false,
-    },
-  });
-  console.log(`✓ 2 hedef (MacBook + Acil fon)`);
-  void emergencyGoal;
+  // Demo sadelestirme: her kullanici icin SADECE MacBook hedefi gosterilir.
+  // (Acil durum fonu ve diger seed'lenmis hedefler kaldirildi — kullanici
+  // istegi 2026-05-19.)
+  console.log(`✓ 1 hedef (MacBook)`);
 
   // 9. Circle
   const familyCircle = await prisma.circle.create({

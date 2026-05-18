@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart3, Bell, ChevronLeft, Home, MessageCircle, Target } from 'lucide-react';
+import { Bell, ChevronLeft, Home, MessageCircle, PiggyBank } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -101,17 +101,14 @@ export function PhoneShell({
               duo={isLearnMode}
             />
             <TabBtn
-              icon={<BarChart3 size={20} />}
-              label="Radar"
-              href="/radar"
-              active={pathname === '/radar'}
-              duo={isLearnMode}
-            />
-            <TabBtn
-              icon={<Target size={20} />}
-              label="Hedefler"
-              href="/goals"
-              active={pathname?.startsWith('/goals') ?? false}
+              icon={<PiggyBank size={20} />}
+              label="Birikim"
+              href="/savings"
+              active={
+                pathname === '/savings' ||
+                pathname === '/radar' ||
+                (pathname?.startsWith('/goals') ?? false)
+              }
               duo={isLearnMode}
             />
             <TabBtn
