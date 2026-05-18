@@ -2382,3 +2382,54 @@ export function useContributeToCircle() {
     onError: (e: Error) => toast.error('Katkı yapılamadı', { description: e.message }),
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// User Impact Summary — PBI: "Niyet bana ne kattı?" ozet sayfasi
+// ─────────────────────────────────────────────────────────────
+
+export interface ImpactCategoryOpportunity {
+  category: SpendingCategory;
+  opportunity: number;
+  monthlyTotalSpent: number;
+}
+
+export interface UserImpactSummary {
+  totalContributedAllTime: number;
+  contributionCount: number;
+  last30dContributed: number;
+  currentScore: number | null;
+  scoreDelta: number;
+  topDriver: {
+    metric: string;
+    delta: number;
+    direction: 'UP' | 'DOWN' | 'FLAT';
+  };
+  todayOpportunity: number;
+  monthlyPotential: number;
+  yearlyPotential: number;
+  thirtyYearProjection: number;
+  topCategoryOpportunities: ImpactCategoryOpportunity[];
+  activeGoalCount: number;
+  circleCount: number;
+}
+
+const MY_IMPACT_SUMMARY_Q = `query MyImpactSummary {
+  myImpactSummary {
+    totalContributedAllTime contributionCount last30dContributed
+    currentScore scoreDelta
+    topDriver { metric delta direction }
+    todayOpportunity monthlyPotential yearlyPotential thirtyYearProjection
+    topCategoryOpportunities { category opportunity monthlyTotalSpent }
+    activeGoalCount circleCount
+  }
+}`;
+
+export function useMyImpactSummary() {
+  return useQuery({
+    queryKey: ['my-impact-summary'],
+    queryFn: () =>
+      gqlFetcher<{ myImpactSummary: UserImpactSummary }, undefined>(MY_IMPACT_SUMMARY_Q),
+    select: (d) => d.myImpactSummary,
+    staleTime: 30_000,
+  });
+}

@@ -119,6 +119,22 @@ export default function DashboardPage() {
 
       <MonthlyTargetWidget />
 
+      <Link
+        href={'/impact' as Route}
+        className="ny-card mb-3 block !p-3 text-left"
+        aria-label="Niyet etkimi gör"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1">
+            <div className="ny-eyebrow">Niyet etkim</div>
+            <div className="mt-1 text-sm font-semibold">
+              Toplam katkım, skor artışım ve potansiyelim
+            </div>
+          </div>
+          <span className="text-primary text-xs">→</span>
+        </div>
+      </Link>
+
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Link href="/radar" className="ny-card text-left">
           <div className="ny-eyebrow">Fırsat</div>

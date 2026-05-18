@@ -32,7 +32,7 @@ const ScoreDriverDirectionRef = builder.enumType('ScoreDriverDirection', {
   values: ['UP', 'DOWN', 'FLAT'] as const,
 });
 
-const FutureScoreDriver = builder.simpleObject('FutureScoreDriver', {
+export const FutureScoreDriverRef = builder.simpleObject('FutureScoreDriver', {
   fields: (t) => ({
     metric: t.string(),
     delta: t.int(),
@@ -55,7 +55,7 @@ const FutureScoreInsights = builder.simpleObject('FutureScoreInsights', {
     delta: t.int(),
     label: t.string(),
     status: t.string(),
-    topDriver: t.field({ type: FutureScoreDriver }),
+    topDriver: t.field({ type: FutureScoreDriverRef }),
     badges: t.field({ type: [UserBadge] }),
   }),
 });
