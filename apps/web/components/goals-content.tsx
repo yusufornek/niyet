@@ -95,11 +95,11 @@ export function GoalsContent() {
 
   return (
     <>
-      {/* Hedefler donut grid */}
+      {/* Hedefler — tam genislik stack kartlar */}
       {isLoading ? (
-        <div className="mb-5 space-y-2">
+        <div className="mb-5 space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="ny-card h-32 animate-pulse" />
+            <div key={i} className="ny-card h-36 animate-pulse" />
           ))}
         </div>
       ) : goals.length === 0 ? (
@@ -107,31 +107,59 @@ export function GoalsContent() {
           <div className="text-sm opacity-70">Henüz hedef yok. Aşağıdan yeni bir tane oluştur.</div>
         </div>
       ) : (
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mb-5 space-y-3">
           {goals.map((g) => {
             const pct = Math.min(100, (g.current / g.currentPrice) * 100);
             const drift = Math.round(((g.currentPrice - g.basePrice) / g.basePrice) * 100);
+            const remaining = Math.max(0, g.currentPrice - g.current);
+            const monthsToGoal =
+              g.monthlyContribution > 0 ? Math.ceil(remaining / g.monthlyContribution) : null;
             return (
-              <Link key={g.id} href={`/goals/${g.id}`} className="ny-card block">
-                <div className="flex items-start gap-3">
+              <Link key={g.id} href={`/goals/${g.id}`} className="ny-card block !p-4">
+                {/* Üst: ad + yıl */}
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className="text-base font-semibold leading-tight">{g.name}</div>
+                  <span className="shrink-0 rounded-full bg-[hsl(var(--divider-soft))] px-2 py-0.5 text-[10px] font-semibold opacity-70">
+                    {new Date(g.targetDate).getFullYear()}
+                  </span>
+                </div>
+
+                {/* Orta: donut + tutar */}
+                <div className="flex items-center gap-4">
                   <GoalDonut pct={pct} />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="text-sm font-semibold">{g.name}</div>
-                      <div className="shrink-0 text-[10px] opacity-60">
-                        {new Date(g.targetDate).getFullYear()}
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] uppercase tracking-wide opacity-60">Biriken</div>
+                    <div className="ny-tight mt-0.5 text-xl font-semibold">
+                      {formatTRY(g.current)}
                     </div>
-                    <div className="mt-2 text-[11px] opacity-70">
-                      {formatTRY(g.current)}{' '}
-                      <span className="opacity-50">/ {formatTRY(g.currentPrice)}</span>
+                    <div className="text-[11px] opacity-60">
+                      / {formatTRY(g.currentPrice)} hedef
                     </div>
-                    {drift > 0 && (
-                      <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600">
-                        <TrendingUp size={10} /> +%{drift} fiyat
-                      </span>
-                    )}
                   </div>
+                </div>
+
+                {/* Alt: detay rozet satırı */}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {g.monthlyContribution > 0 && (
+                    <span className="rounded-full bg-[hsl(var(--divider-soft))] px-2 py-0.5 text-[10px]">
+                      Aylık {formatTRY(g.monthlyContribution)}
+                    </span>
+                  )}
+                  {monthsToGoal != null && monthsToGoal < 999 && (
+                    <span className="rounded-full bg-[hsl(var(--divider-soft))] px-2 py-0.5 text-[10px]">
+                      ~{monthsToGoal} ay kaldı
+                    </span>
+                  )}
+                  {remaining > 0 && (
+                    <span className="rounded-full bg-[hsl(var(--divider-soft))] px-2 py-0.5 text-[10px]">
+                      {formatTRY(remaining)} eksik
+                    </span>
+                  )}
+                  {drift > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                      <TrendingUp size={9} /> +%{drift} fiyat
+                    </span>
+                  )}
                 </div>
               </Link>
             );
@@ -240,8 +268,8 @@ export function GoalsContent() {
  * tek arc + center'da yüzde.
  */
 function GoalDonut({ pct }: { pct: number }) {
-  const R = 28;
-  const STROKE = 8;
+  const R = 44;
+  const STROKE = 11;
   const C = 2 * Math.PI * R;
   const safePct = Math.max(0, Math.min(100, pct));
   const dash = (safePct / 100) * C;
@@ -249,19 +277,19 @@ function GoalDonut({ pct }: { pct: number }) {
   // Renk: 0-30 sky, 30-70 amber, 70-100 emerald
   const color = pct >= 70 ? '#059669' : pct >= 30 ? '#d97706' : '#0284c7';
   return (
-    <div className="relative h-[72px] w-[72px] shrink-0">
-      <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90">
+    <div className="relative h-[112px] w-[112px] shrink-0">
+      <svg viewBox="0 0 112 112" className="h-full w-full -rotate-90">
         <circle
-          cx="36"
-          cy="36"
+          cx="56"
+          cy="56"
           r={R}
           fill="none"
           stroke="hsl(var(--divider-soft))"
           strokeWidth={STROKE}
         />
         <circle
-          cx="36"
-          cy="36"
+          cx="56"
+          cy="56"
           r={R}
           fill="none"
           stroke={color}
@@ -270,8 +298,11 @@ function GoalDonut({ pct }: { pct: number }) {
           strokeLinecap="round"
         />
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold">
-        %{Math.round(safePct)}
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-lg font-bold leading-none" style={{ color }}>
+          %{Math.round(safePct)}
+        </div>
+        <div className="mt-0.5 text-[9px] uppercase tracking-wide opacity-50">ilerleme</div>
       </div>
     </div>
   );
