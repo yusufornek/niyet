@@ -234,9 +234,9 @@ function TargetForm({
   );
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div>
-        <label className="block text-[11px] font-semibold" htmlFor="monthly-target-amount">
+        <label className="mb-1 block text-xs opacity-60" htmlFor="monthly-target-amount">
           Aylık hedef (₺)
         </label>
         <input
@@ -246,13 +246,13 @@ function TargetForm({
           step={50}
           value={amountInput}
           onChange={(e) => setAmountInput(e.target.value)}
-          className="mt-1 w-full rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1 text-sm"
+          className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
           aria-label="Aylık katkı hedefi tutarı"
         />
       </div>
 
       <div>
-        <label className="block text-[11px] font-semibold" htmlFor="monthly-target-warn">
+        <label className="mb-1 block text-xs opacity-60" htmlFor="monthly-target-warn">
           Yaklaşma eşiği (%)
         </label>
         <input
@@ -263,28 +263,30 @@ function TargetForm({
           step={5}
           value={warnInput}
           onChange={(e) => setWarnInput(e.target.value)}
-          className="mt-1 w-full rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1 text-sm"
+          className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
           aria-label="Yaklaşma eşiği yüzdesi"
         />
-        <p className="mt-1 text-[10px] opacity-60">
+        <p className="mt-1.5 text-[11px] opacity-60">
           Bu yüzdeye ulaştığında “yaklaşıyorsun” bildirimi alırsın (default %90).
         </p>
       </div>
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-col gap-2 pt-2 sm:flex-row">
         {onCancel && (
           <button
+            type="button"
             onClick={onCancel}
-            className="ny-chip flex items-center justify-center gap-1 !py-1 text-xs"
+            className="ny-pill-ghost flex items-center justify-center gap-1"
             aria-label="Vazgeç"
           >
-            <X size={12} /> Vazgeç
+            <X size={16} /> Vazgeç
           </button>
         )}
         <button
+          type="button"
           onClick={() => onSubmit(amount, warnPct / 100)}
           disabled={!canSubmit || pending}
-          className="ny-pill-sm flex-1 !py-1 !text-xs disabled:opacity-50"
+          className="ny-pill flex-1 disabled:opacity-50"
           aria-label="Kaydet"
         >
           {pending ? 'Kaydediliyor…' : 'Kaydet'}
@@ -293,8 +295,9 @@ function TargetForm({
 
       {onDelete && (
         <button
+          type="button"
           onClick={onDelete}
-          className="mt-1 w-full text-center text-[10px] text-red-600 opacity-70 hover:opacity-100"
+          className="mt-1 w-full text-center text-xs text-red-600/80 hover:text-red-600"
           aria-label="Hedefi sil"
         >
           Aylık hedefi sil

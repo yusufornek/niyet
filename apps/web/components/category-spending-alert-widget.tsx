@@ -249,19 +249,18 @@ function PickerForm({ available, onSubmit, onCancel, pending }: PickerProps) {
   const canSubmit = Boolean(selected) && Number.isFinite(limit) && limit > 0;
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg bg-[hsl(var(--divider-soft))]/40 p-2">
+    <div className="ny-card mt-2 space-y-3 !p-4">
       <div>
-        <div className="mb-1.5 text-[11px] font-semibold">Kategori</div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="mb-2 text-xs opacity-60">Kategori</div>
+        <div className="flex flex-wrap gap-2">
           {available.map((c) => {
             const isActive = selected === c;
             return (
               <button
                 key={c}
+                type="button"
                 onClick={() => setSelected(c)}
-                className={`ny-chip !py-1 text-[11px] ${
-                  isActive ? 'border-primary text-primary' : ''
-                }`}
+                className={`ny-chip ${isActive ? 'border-primary text-primary' : ''}`}
                 aria-label={`${CATEGORY_LABEL[c].label} seç`}
               >
                 {CATEGORY_LABEL[c].icon} {CATEGORY_LABEL[c].label}
@@ -272,7 +271,7 @@ function PickerForm({ available, onSubmit, onCancel, pending }: PickerProps) {
       </div>
 
       <div>
-        <label className="block text-[11px] font-semibold" htmlFor="limit-input">
+        <label className="mb-1 block text-xs opacity-60" htmlFor="limit-input">
           Aylık limit (₺)
         </label>
         <input
@@ -282,22 +281,23 @@ function PickerForm({ available, onSubmit, onCancel, pending }: PickerProps) {
           step={50}
           value={limitInput}
           onChange={(e) => setLimitInput(e.target.value)}
-          className="mt-1 w-full rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1 text-xs"
+          className="w-full rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
           aria-label="Aylık limit tutarı"
         />
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={onCancel} className="ny-chip flex-1 !py-1 text-[11px]" aria-label="Vazgeç">
+      <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+        <button type="button" onClick={onCancel} className="ny-pill-ghost" aria-label="Vazgeç">
           Vazgeç
         </button>
         <button
+          type="button"
           onClick={() => selected && onSubmit(selected, limit)}
           disabled={!canSubmit || pending}
-          className="ny-pill-sm flex-1 !py-1 !text-[11px] disabled:opacity-50"
+          className="ny-pill flex-1 disabled:opacity-50"
           aria-label="Limit ekle"
         >
-          {pending ? '…' : 'Ekle'}
+          {pending ? 'Ekleniyor…' : 'Limit ekle'}
         </button>
       </div>
     </div>

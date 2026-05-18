@@ -120,32 +120,31 @@ export default function CircleDetailPage() {
 
       {/* Davet kodu */}
       {circle.inviteCode && (
-        <section className="ny-card mb-3 !p-3">
-          <div className="mb-1 text-[11px] font-semibold opacity-70">Davet kodu</div>
+        <section className="ny-card mb-3">
+          <div className="ny-eyebrow mb-2">Davet kodu</div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 rounded-md bg-[hsl(var(--divider-soft))] px-2 py-1.5 text-center font-mono text-base tracking-widest">
+            <code className="flex-1 rounded-xl bg-[hsl(var(--divider-soft))] p-3 text-center font-mono text-base tracking-widest">
               {circle.inviteCode}
             </code>
             <button
+              type="button"
               onClick={handleCopy}
-              className="ny-chip flex items-center gap-1 !py-1.5 text-xs"
+              className="ny-chip flex items-center gap-1"
               aria-label="Davet kodunu kopyala"
             >
-              {codeCopied ? <Check size={12} /> : <Copy size={12} />}
+              {codeCopied ? <Check size={14} /> : <Copy size={14} />}
               {codeCopied ? 'Kopyalandı' : 'Kopyala'}
             </button>
           </div>
-          <p className="mt-1.5 text-[10px] opacity-60">
+          <p className="mt-2 text-xs opacity-60">
             Bu kodu paylaş — üye olmak isteyenler ana sayfada “Kod ile katıl” diyebilir.
           </p>
         </section>
       )}
 
       {/* Katkı yap */}
-      <section className="ny-card mb-3 !p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-[11px] font-semibold opacity-70">Bu ay katkımı ekle</div>
-        </div>
+      <section className="ny-card mb-3">
+        <div className="ny-eyebrow mb-2">Bu ay katkımı ekle</div>
         <div className="flex items-center gap-2">
           <input
             type="number"
@@ -153,16 +152,17 @@ export default function CircleDetailPage() {
             step={50}
             value={contribInput}
             onChange={(e) => setContribInput(e.target.value)}
-            className="flex-1 rounded-md border border-[hsl(var(--hairline))] bg-white px-2 py-1.5 text-sm"
+            className="flex-1 rounded-xl border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas-parchment))] p-3 text-sm"
             aria-label="Katkı tutarı"
           />
           <button
+            type="button"
             disabled={!canContribute || contribute.isPending}
             onClick={() => contribute.mutate({ circleId: circle.id, amount: contribAmount })}
-            className="ny-pill-sm flex items-center gap-1 !py-1.5 !text-xs disabled:opacity-50"
+            className="ny-pill-sm flex items-center gap-1.5 disabled:opacity-50"
             aria-label="Katkı ekle"
           >
-            <Plus size={12} /> {contribute.isPending ? '…' : 'Katkı ekle'}
+            <Plus size={14} /> {contribute.isPending ? 'Ekleniyor…' : 'Ekle'}
           </button>
         </div>
       </section>
