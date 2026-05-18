@@ -480,9 +480,28 @@ model Circle {
   type      CircleType
   /// Topluluk çemberi public mi? false ise davet ile katılım
   isPublic  Boolean    @default(false)
+  /// 8 karakterli benzersiz davet kodu (alphanumeric uppercase). Paylasilarak
+  /// arkadaslarin/aile uyelerini cembere davet eder.
+  inviteCode String?   @unique
   createdAt DateTime   @default(now())
 
-  members CircleMembership[]
+  members    CircleMembership[]
+  milestones CircleMilestoneLog[]
+}
+
+/// Bir cemberin %25/%50/%75/%100 milestone'larina ulasildiginda buraya log
+/// yazilir; ayni milestone tekrar bildirim uretmesin diye dedup kaynagi.
+model CircleMilestoneLog {
+  id        String   @id @default(cuid())
+  circleId  String
+  /// 25, 50, 75, 100
+  percent   Int
+  reachedAt DateTime @default(now())
+
+  circle Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, percent])
+  @@index([circleId])
 }
 
 model CircleMembership {

@@ -22,3 +22,4 @@ export * from './category-auto-save';
 export * from './fund-recommendation';
 export * from './category-spending-alert';
 export * from './monthly-contribution-target';
+export * from './circle-progress';
