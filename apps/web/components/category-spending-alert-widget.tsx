@@ -80,12 +80,13 @@ export function CategorySpendingAlertWidget() {
         </div>
         {list.length > 0 && (
           <button
+            type="button"
             onClick={() => evaluate.mutate(undefined)}
             disabled={evaluate.isPending}
-            className="ny-pill-sm flex shrink-0 items-center gap-1 !py-1 !text-[11px] disabled:opacity-50"
+            className="ny-chip flex shrink-0 items-center gap-1.5 disabled:opacity-50"
             aria-label="Şimdi değerlendir"
           >
-            <Play size={11} /> {evaluate.isPending ? '…' : 'Şimdi değerlendir'}
+            <Play size={12} /> {evaluate.isPending ? 'Değerlendiriliyor…' : 'Değerlendir'}
           </button>
         )}
       </header>
@@ -110,11 +111,12 @@ export function CategorySpendingAlertWidget() {
 
       {!picking && recommendable.length > 0 && (
         <button
+          type="button"
           onClick={() => setPicking(true)}
-          className="ny-pill-ghost mt-2 flex w-full items-center justify-center gap-1.5 !py-1.5 !text-xs"
+          className="ny-pill-ghost mt-3 flex w-full items-center justify-center gap-1.5"
           aria-label="Yeni limit ekle"
         >
-          <Plus size={12} /> Yeni limit ekle
+          <Plus size={16} /> Yeni limit ekle
         </button>
       )}
 

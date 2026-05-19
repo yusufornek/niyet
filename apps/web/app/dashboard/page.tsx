@@ -23,10 +23,12 @@
  */
 import { Bell, Pause, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { FinancialSnapshotCard } from '@/components/financial-snapshot-card';
 import { MonthlyTargetWidget } from '@/components/monthly-target-widget';
 import { PhoneShell } from '@/components/phone-shell';
+import { ScoreCard } from '@/components/score-card';
 import {
   useDashboard,
   useFutureScoreInsights,
@@ -37,6 +39,7 @@ import {
 import { formatTRY } from '@/lib/utils';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { data: me } = useMe();
   const pauseStatus = me?.me?.pauseStatus;
   const paused = pauseStatus?.isPaused ?? false;
@@ -49,6 +52,7 @@ export default function DashboardPage() {
   const dashboard = dash?.dashboard;
   const score = scoreData?.futureScoreInsights?.current;
   const scoreInsight = scoreData?.futureScoreInsights;
+  const acceptedShown = dashboard?.acceptedContributionsLast30d ?? 0;
   const totalAccepted = dashboard?.totalAcceptedContributions ?? 0;
 
   return (
@@ -91,6 +95,37 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
+
+      <ScoreCard
+        score={score?.score ?? 0}
+        delta={scoreInsight?.delta ?? 0}
+        title={scoreInsight?.label ?? 'İyi gidiyorsun'}
+        subtitle="Üzerine gel — genel istatistiklerini gör."
+        status={scoreInsight?.status ?? 'Sağlıklı finansal ritim'}
+        onOpen={() => router.push('/score')}
+        stats={[
+          {
+            label: 'Kabul edilen tasarruf',
+            value: formatTRY(acceptedShown),
+            foot: 'son 30 gün',
+          },
+          {
+            label: 'Aktif kural',
+            value: `${dashboard?.activeRulesCount ?? 0}`,
+            foot: 'otomatik katkı',
+          },
+          {
+            label: 'Hedef ilerleme',
+            value: goal ? `${Math.round((goal.current / goal.currentPrice) * 100)}%` : '—',
+            foot: goal?.name ?? 'hedef yok',
+          },
+          {
+            label: 'Bu ay fırsat',
+            value: formatTRY(dashboard?.totalOpportunityLast30d ?? 0),
+            foot: 'azaltılabilir',
+          },
+        ]}
+      />
 
       <MonthlyTargetWidget />
 

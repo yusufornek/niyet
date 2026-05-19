@@ -96,12 +96,21 @@ export async function recomputeAndPersistFutureScore(
   return snapshot;
 }
 
+/**
+ * Mevcut snapshot 1 saatten yeni ise reuse eder; aksi takdirde recompute
+ * tetikler. Demo'da kullanıcı anında güncel skor görsün diye agresif TTL.
+ * Cron `refreshFutureScoresDaily` ayrıca günlük baseline yenileme yapar.
+ */
+const FUTURE_SCORE_TTL_MS = 60 * 60 * 1000; // 1 saat
+
 export async function ensureFutureScore(ctx: GraphQLContext, userId: string) {
   const latest = await ctx.prisma.futureScoreSnapshot.findFirst({
     where: { userId },
     orderBy: { computedAt: 'desc' },
   });
-  if (latest) return latest;
+  if (latest && ctx.now().getTime() - latest.computedAt.getTime() < FUTURE_SCORE_TTL_MS) {
+    return latest;
+  }
   return recomputeAndPersistFutureScore(ctx, userId, 'CRON_REFRESH');
 }
 
