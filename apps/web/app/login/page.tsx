@@ -30,17 +30,12 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  async function handleDemoMode() {
-    setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInAnonymously();
-    setLoading(false);
-    if (error) {
-      toast.error('Demo modu başlatılamadı', { description: error.message });
-      return;
-    }
-    router.push('/dashboard');
-    router.refresh();
+  function handleDemoMode() {
+    setEmail('btk@btkakademi.gov.tr');
+    setPassword('btk123');
+    toast.success('Demo bilgileri dolduruldu', {
+      description: "Giriş Yap'a basarak devam et",
+    });
   }
 
   return (
