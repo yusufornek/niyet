@@ -3,6 +3,23 @@
 > **AI Destekli Mikro Emeklilik ve Birikim Alışkanlığı Platformu**
 > _Harcamadığını geleceğine aktar._
 
+---
+
+## Canlı Demo
+
+> ### → **<https://niyet-web.vercel.app>**
+>
+> **BTK Akademi Jüri Girişi**
+>
+> | Alan  | Değer                   |
+> | ----- | ----------------------- |
+> | Email | `btk@btkakademi.gov.tr` |
+> | Şifre | `btk123`                |
+>
+> Linke tıkla → `/login` formuna yukarıdaki bilgileri gir → tüm akış demo data ile gezilebilir.
+
+---
+
 Niyet, kullanıcının kredi kartı ve banka hareketlerini izinli şekilde analiz ederek azaltılabilir harcamaları tespit eden, bu mikro tasarrufları uzun vadeli emeklilik katkısına dönüştüren mobil-öncelikli bir davranışsal fintech platformudur.
 
 > **Demo aşamasında**: Yasal hazırlıklar nedeniyle gerçek banka entegrasyonu yok. Mock data + Gemini AI ile uçtan uca akış simüle ediliyor.
