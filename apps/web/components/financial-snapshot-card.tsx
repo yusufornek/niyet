@@ -4,20 +4,28 @@
  * FinancialSnapshotCard — Dashboard üst kısmında "tek bakışta finansal durum".
  *
  * PBI: "Ana ekranda harcama fırsatlarımı, Gelecek Skoru'mu ve katkı durumumu
- * tek bakışta görmek istiyorum; böylece finansal durumumu hızlıca anlayabilirim."
+ * tek bakışta görmek istiyorum."
  *
- * Tasarım:
- * - Bu 3 metrik zaten Dashboard'da farklı yerlerde vardı (hero başlık + ScoreCard
- *   içinde 4 mini-stat + alt kart). Bu component üç ayrı kaynağı **tek satırda**
- *   birleştirir — kullanıcı sayfaya girdiği anda kritik finansal bilgiyi görür.
- * - Pure presentation — kendi veri çekmez, prop ile alır. Dashboard veri akışını
- *   bozmadan eklemek için.
- * - Tıklanabilir: her metrik ilgili sayfaya yönlendirir (radar/score/contributions).
+ * Tasarım (kullanıcı isteği 2026-05-19): uiverse.io kawaii-range slider'ları ile
+ * 3 metrik. Slider'lar görsel-only (`pointer-events: none`); her satır clickable
+ * Link içinde → tıklayınca ilgili detay sayfasına yönlendirir.
+ *
+ * Renkler:
+ *   - Fırsat → amber (#f59e0b)
+ *   - Skor   → emerald (#10b981)
+ *   - Katkı  → primary (#0066cc, Niyet Action Blue)
+ *
+ * Slider yüzdeleri (görsel anlam):
+ *   - Skor: doğrudan 0-100
+ *   - Fırsat: monthly opportunity / 5000 ₺ baseline
+ *   - Katkı: lifetime total / 100000 ₺ baseline
  */
 import { ArrowDownRight, ArrowUpRight, Minus, PiggyBank, Sparkles, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 import { formatTRY } from '@/lib/utils';
+
+import './snapshot-range.css';
 
 interface SnapshotProps {
   /// Son 30 günün toplam azaltılabilir tutarı
@@ -32,6 +40,9 @@ interface SnapshotProps {
   loading?: boolean;
 }
 
+const OPPORTUNITY_BASELINE = 5000;
+const ACCEPTED_BASELINE = 100000;
+
 export function FinancialSnapshotCard({
   opportunityLast30d,
   futureScore,
@@ -41,41 +52,48 @@ export function FinancialSnapshotCard({
 }: SnapshotProps) {
   if (loading) {
     return (
-      <div className="ny-card mb-3 grid grid-cols-3 gap-2 !p-3">
+      <div className="ny-card mb-3 space-y-3 !p-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-14 animate-pulse rounded-md bg-[hsl(var(--divider-soft))]" />
+          <div key={i} className="h-12 animate-pulse rounded-2xl bg-[hsl(var(--divider-soft))]" />
         ))}
       </div>
     );
   }
 
+  const opportunityPct = clamp01((opportunityLast30d / OPPORTUNITY_BASELINE) * 100);
+  const scorePct = clamp01(futureScore ?? 0);
+  const acceptedPct = clamp01((totalAccepted / ACCEPTED_BASELINE) * 100);
+
   return (
-    <section className="ny-card mb-3 !p-3" aria-label="Finansal durum özeti">
-      <div className="ny-eyebrow mb-2">Bir bakışta</div>
-      <div className="grid grid-cols-3 gap-2">
-        <SnapshotTile
+    <section className="ny-card mb-3 !p-4" aria-label="Finansal durum özeti">
+      <div className="ny-eyebrow mb-3">Bir bakışta</div>
+      <div className="space-y-3">
+        <KawaiiRow
           href="/radar"
-          icon={<Sparkles size={11} className="text-amber-600" />}
           label="Bu ay fırsat"
           value={formatTRY(opportunityLast30d)}
-          tone="amber"
+          icon={<Sparkles size={12} className="text-amber-600" />}
+          percent={opportunityPct}
+          color="#f59e0b"
           aria="Tasarruf Radarı'na git"
         />
-        <SnapshotTile
+        <KawaiiRow
           href="/score"
-          icon={<Trophy size={11} className="text-emerald-700" />}
           label="Gelecek Skoru"
           value={futureScore != null ? String(futureScore) : '—'}
           accessory={<ScoreDelta delta={scoreDelta} />}
-          tone="emerald"
+          icon={<Trophy size={12} className="text-emerald-700" />}
+          percent={scorePct}
+          color="#10b981"
           aria="Gelecek Skoru detayı"
         />
-        <SnapshotTile
+        <KawaiiRow
           href="/contributions"
-          icon={<PiggyBank size={11} className="text-primary" />}
           label="Toplam katkı"
           value={formatTRY(totalAccepted)}
-          tone="primary"
+          icon={<PiggyBank size={12} className="text-primary" />}
+          percent={acceptedPct}
+          color="#0066cc"
           aria="Katkı geçmişi"
         />
       </div>
@@ -83,30 +101,44 @@ export function FinancialSnapshotCard({
   );
 }
 
-interface TileProps {
+interface RowProps {
   href: string;
-  icon: React.ReactNode;
   label: string;
   value: string;
+  icon: React.ReactNode;
+  percent: number; // 0-100
+  color: string;
   accessory?: React.ReactNode;
-  tone: 'amber' | 'emerald' | 'primary';
   aria: string;
 }
 
-function SnapshotTile({ href, icon, label, value, accessory, aria }: TileProps) {
+function KawaiiRow({ href, label, value, icon, percent, color, accessory, aria }: RowProps) {
   return (
     <Link
       href={href as `/${string}`}
-      className="group flex flex-col rounded-lg border border-[hsl(var(--hairline))] bg-white p-2 transition-colors hover:bg-[hsl(var(--divider-soft))]/40"
+      className="block rounded-2xl transition-opacity hover:opacity-90"
       aria-label={aria}
     >
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-60">
-        {icon} {label}
+      <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+        <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-60">
+          {icon} {label}
+        </span>
+        <span className="flex items-baseline gap-1.5 text-sm font-semibold">
+          {value}
+          {accessory}
+        </span>
       </div>
-      <div className="mt-1 flex items-baseline justify-between gap-1">
-        <span className="text-sm font-semibold leading-tight">{value}</span>
-        {accessory}
-      </div>
+      <input
+        type="range"
+        className="kawaii-range"
+        min={0}
+        max={100}
+        value={Math.round(percent)}
+        readOnly
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{ ['--base' as string]: color }}
+      />
     </Link>
   );
 }
@@ -132,4 +164,8 @@ function ScoreDelta({ delta }: { delta: number }) {
       {delta}
     </span>
   );
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(100, value));
 }
