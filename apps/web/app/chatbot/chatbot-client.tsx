@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from 'react';
 import { PhoneShell } from '@/components/phone-shell';
 import {
   useChatSession,
-  useChatSessions,
   useDeleteChatSession,
   useGoals,
   useSendChatMessage,
@@ -32,7 +31,6 @@ export default function ChatbotClient() {
   const [lastRecommendation, setLastRecommendation] = useState<CoachRecommendation | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: sessionsData } = useChatSessions(10);
   const { data: sessionData } = useChatSession(sessionId);
   const sendMessage = useSendChatMessage();
   const deleteSession = useDeleteChatSession();
@@ -109,32 +107,6 @@ export default function ChatbotClient() {
       {goalContext && (
         <div className="ny-card border-primary/30 bg-primary/5 mb-3 text-sm">
           <span className="font-semibold">{goalContext}</span> hedefi için sohbet ediyorsun.
-        </div>
-      )}
-
-      {!sessionId && (sessionsData?.chatSessions ?? []).length > 0 && (
-        <div className="mb-4">
-          <div className="ny-eyebrow mb-2">Önceki sohbetler</div>
-          <div className="space-y-2">
-            {sessionsData!.chatSessions.slice(0, 3).map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSessionId(s.id)}
-                className="ny-card w-full text-left text-sm"
-              >
-                <div className="font-semibold">{s.title ?? 'Sohbet'}</div>
-                <div className="text-xs opacity-60">
-                  {new Date(s.updatedAt).toLocaleDateString('tr-TR', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                  {s.totalTokens > 0 && ` · ${s.totalTokens} token`}
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
       )}
 

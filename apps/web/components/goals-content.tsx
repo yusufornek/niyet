@@ -252,13 +252,6 @@ export function GoalsContent() {
           {createGoal.isPending ? 'Oluşturuluyor…' : 'Hedef oluştur'}
         </button>
       </div>
-
-      <Link
-        href={goals[0] ? `/funds?goalId=${goals[0].id}` : '/funds'}
-        className="text-primary mt-5 block w-full text-center text-sm"
-      >
-        Fon seçeneklerini incele →
-      </Link>
     </>
   );
 }

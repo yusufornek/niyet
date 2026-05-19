@@ -80,13 +80,14 @@ export function CategoryAutoSaveWidget() {
         </div>
         {activeRules.length > 0 && (
           <button
+            type="button"
             onClick={() => runAll.mutate(undefined)}
             disabled={runAll.isPending}
-            className="ny-pill-sm flex shrink-0 items-center gap-1 !py-1 !text-[11px] disabled:opacity-50"
+            className="ny-chip flex shrink-0 items-center gap-1.5 disabled:opacity-50"
             aria-label="Tüm kuralları çalıştır"
           >
-            <Play size={11} />
-            {runAll.isPending ? '…' : 'Tümünü çalıştır'}
+            <Play size={12} />
+            {runAll.isPending ? 'Çalışıyor…' : 'Tümünü çalıştır'}
           </button>
         )}
       </header>
@@ -126,9 +127,10 @@ export function CategoryAutoSaveWidget() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => trigger.mutate({ id: r.id })}
                   disabled={trigger.isPending || !r.active}
-                  className="ny-pill-sm !py-1 !text-[10px] disabled:opacity-50"
+                  className="ny-chip shrink-0 text-xs disabled:opacity-50"
                   aria-label={`${meta.label} için şimdi hesapla`}
                 >
                   Hesapla
@@ -159,27 +161,29 @@ export function CategoryAutoSaveWidget() {
 
       {!picking && availableForRecommend.length > 0 && (
         <button
+          type="button"
           onClick={() => setPicking(true)}
-          className="ny-pill-ghost mt-2 flex w-full items-center justify-center gap-1.5 !py-1.5 !text-xs"
+          className="ny-pill-ghost mt-3 flex w-full items-center justify-center gap-1.5"
           aria-label="Yeni kategori ekle"
         >
-          <Plus size={12} /> Yeni kategori ekle
+          <Plus size={16} /> Yeni kategori ekle
         </button>
       )}
 
       {picking && (
-        <div className="mt-2 rounded-lg bg-[hsl(var(--divider-soft))]/40 p-2">
-          <div className="mb-1.5 text-[11px] font-semibold">Önerilen kategoriler</div>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="ny-card mt-3 space-y-3 !p-4">
+          <div className="ny-eyebrow">Önerilen kategoriler</div>
+          <div className="flex flex-wrap gap-2">
             {availableForRecommend.map((c) => (
               <button
                 key={c}
+                type="button"
                 onClick={() => {
                   createRule.mutate({ category: c });
                   setPicking(false);
                 }}
                 disabled={createRule.isPending}
-                className="ny-chip !py-1 text-[11px] disabled:opacity-50"
+                className="ny-chip disabled:opacity-50"
                 aria-label={`${CATEGORY_LABEL[c].label} ekle`}
               >
                 {CATEGORY_LABEL[c].icon} {CATEGORY_LABEL[c].label}
@@ -187,8 +191,9 @@ export function CategoryAutoSaveWidget() {
             ))}
           </div>
           <button
+            type="button"
             onClick={() => setPicking(false)}
-            className="mt-2 text-[10px] opacity-60 hover:opacity-100"
+            className="w-full text-center text-xs opacity-60 hover:opacity-100"
           >
             Vazgeç
           </button>
