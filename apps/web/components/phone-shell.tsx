@@ -41,6 +41,8 @@ export function PhoneShell({
   return (
     <div className="flex h-[100dvh] items-stretch justify-center bg-[hsl(var(--canvas-parchment))] sm:h-auto sm:min-h-screen sm:items-start sm:py-8">
       <div
+        id="phone-shell-host"
+        data-tour-host="true"
         className={cn(
           'relative flex h-full w-full flex-col overflow-hidden sm:h-[844px] sm:w-[390px] sm:rounded-[44px] sm:border sm:border-black/10',
           dark
