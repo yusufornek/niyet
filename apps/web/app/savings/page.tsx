@@ -63,15 +63,7 @@ function SavingsPageInner() {
         />
       </div>
 
-      {tab === 'radar' ? (
-        <div data-tour="radar-donut">
-          <RadarContent />
-        </div>
-      ) : (
-        <div data-tour="goals-list">
-          <GoalsContent />
-        </div>
-      )}
+      {tab === 'radar' ? <RadarContent /> : <GoalsContent />}
     </PhoneShell>
   );
 }

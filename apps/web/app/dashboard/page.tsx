@@ -65,7 +65,7 @@ export default function DashboardPage() {
         </Link>
       }
     >
-      <div className="pb-4 pt-2" data-tour="welcome-hero">
+      <div className="pb-4 pt-2">
         <div className="ny-eyebrow">Merhaba {userName || 'Niyetli'}</div>
         <h1 className="ny-h1 mt-1 flex items-center gap-2">
           {dashLoading ? (
@@ -79,15 +79,13 @@ export default function DashboardPage() {
         </h1>
       </div>
 
-      <div data-tour="snapshot-card">
-        <FinancialSnapshotCard
-          opportunityLast30d={dashboard?.totalOpportunityLast30d ?? 0}
-          futureScore={score?.score ?? null}
-          scoreDelta={scoreInsight?.delta ?? 0}
-          totalAccepted={totalAccepted}
-          loading={dashLoading}
-        />
-      </div>
+      <FinancialSnapshotCard
+        opportunityLast30d={dashboard?.totalOpportunityLast30d ?? 0}
+        futureScore={score?.score ?? null}
+        scoreDelta={scoreInsight?.delta ?? 0}
+        totalAccepted={totalAccepted}
+        loading={dashLoading}
+      />
 
       {paused && (
         <div className="ny-card border-primary/30 mb-3 flex items-center gap-3">
@@ -135,9 +133,7 @@ export default function DashboardPage() {
         ]}
       />
 
-      <div data-tour="monthly-target">
-        <MonthlyTargetWidget />
-      </div>
+      <MonthlyTargetWidget />
 
       {goal && <ActiveGoalCard goal={goal} />}
 
@@ -243,7 +239,6 @@ function NotificationBell() {
   return (
     <Link
       href="/notifications"
-      data-tour="notification-bell"
       aria-label={`Bildirimler${unreadCount > 0 ? ` (${unreadCount} okunmamış)` : ''}`}
       className="relative -ml-1 rounded-full p-1.5 hover:bg-black/5"
     >

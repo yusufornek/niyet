@@ -9,7 +9,6 @@ import { PhoneShell } from '@/components/phone-shell';
 import { useMe } from '@/lib/graphql/queries';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/stores/use-app';
-import { useTour } from '@/lib/stores/use-tour';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -19,14 +18,8 @@ export default function SettingsPage() {
   const paused = useApp((s) => s.paused);
   const notificationsEnabled = useApp((s) => s.notificationsEnabled);
   const toggleNotifications = useApp((s) => s.toggleNotifications);
-  const restartTour = useTour((s) => s.restart);
   const [confirm, setConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-
-  const handleRestartTour = () => {
-    restartTour();
-    router.push('/dashboard');
-  };
 
   const me = meData?.me;
   const firstLetter = me?.name?.[0]?.toUpperCase() ?? 'N';
@@ -72,9 +65,6 @@ export default function SettingsPage() {
         value={connected ? 'Bağlı' : 'Bağlı değil'}
         onClick={() => (connected ? setConfirm(true) : router.push('/connect'))}
       />
-
-      <div className="ny-eyebrow mb-2 mt-5">Yardım</div>
-      <Row label="Turu tekrar başlat" value="" onClick={handleRestartTour} />
 
       <div className="ny-eyebrow mb-2 mt-5">Yasal</div>
       <Row label="Gizlilik" value="" onClick={() => {}} />
