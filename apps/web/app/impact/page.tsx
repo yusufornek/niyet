@@ -108,7 +108,7 @@ export default function ImpactPage() {
       </p>
 
       {/* Hero: Toplam katki */}
-      <section className="ny-tile-dark mb-3">
+      <section className="ny-tile-dark mb-3" data-tour="impact-hero">
         <div className="text-xs uppercase tracking-wider text-white/60">Toplam mikro katkı</div>
         <div className="ny-tight mt-2 text-4xl font-semibold">
           {formatTRY(impact.totalContributedAllTime)}

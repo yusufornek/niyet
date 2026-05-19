@@ -21,7 +21,7 @@ export default function ScorePage() {
 
   return (
     <PhoneShell title="Gelecek Skoru" back>
-      <div className="ny-tile-dark mb-5 py-8 text-center">
+      <div className="ny-tile-dark mb-5 py-8 text-center" data-tour="score-hero">
         <div className="text-xs uppercase tracking-wider text-white/60">Skorun</div>
         <div className="ny-tight mt-2 text-[88px] font-semibold leading-none">
           {isLoading ? '…' : (score?.score ?? 0)}

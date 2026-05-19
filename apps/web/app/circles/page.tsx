@@ -19,7 +19,7 @@ export default function CirclesPage() {
     <PhoneShell title="Birikim Çemberleri" back>
       <p className="ny-tagline mb-3">Ailen veya topluluğunla ortak hedef.</p>
 
-      <div className="mb-4 grid grid-cols-2 gap-2">
+      <div className="mb-4 grid grid-cols-2 gap-2" data-tour="circles-list">
         <button
           onClick={() => setMode((m) => (m === 'create' ? 'idle' : 'create'))}
           className={`ny-pill-sm flex items-center justify-center gap-1.5 ${
