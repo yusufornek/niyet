@@ -117,6 +117,7 @@ export function PhoneShell({
                 (pathname?.startsWith('/goals') ?? false)
               }
               duo={isLearnMode}
+              tourId="tab-savings"
             />
             <TabBtn
               icon={<MessageCircle size={20} />}
@@ -124,6 +125,7 @@ export function PhoneShell({
               href="/chatbot"
               active={pathname === '/chatbot'}
               duo={isLearnMode}
+              tourId="tab-chatbot"
             />
             <TabBtn
               icon={<LayoutGrid size={20} />}
@@ -131,6 +133,7 @@ export function PhoneShell({
               href="/menu"
               active={pathname === '/menu'}
               duo={isLearnMode}
+              tourId="tab-menu"
             />
           </nav>
         )}
@@ -145,15 +148,17 @@ function TabBtn({
   href,
   active,
   duo,
+  tourId,
 }: {
   icon: ReactNode;
   label: string;
   href: string;
   active: boolean;
   duo?: boolean;
+  tourId?: string;
 }) {
   return (
-    <Link href={href} className="flex flex-col items-center gap-1 px-2">
+    <Link href={href} data-tour={tourId} className="flex flex-col items-center gap-1 px-2">
       <span
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded-xl',

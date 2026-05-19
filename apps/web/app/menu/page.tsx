@@ -220,6 +220,7 @@ export default function MenuPage() {
         <input
           className="w-full rounded-full bg-white px-4 py-2 font-mono text-zinc-800 shadow-md outline-none ring-1 ring-zinc-300 duration-300 placeholder:text-zinc-400 placeholder:opacity-80 focus:shadow-lg focus:shadow-[hsl(var(--primary)/0.35)] focus:ring-2 focus:ring-[hsl(var(--primary))]"
           autoComplete="off"
+          data-tour="menu-search"
           placeholder="Menüde ara..."
           name="menu-search"
           type="text"
@@ -248,6 +249,13 @@ export default function MenuPage() {
                   <Link
                     key={item.href}
                     href={item.href as `/${string}`}
+                    data-tour={
+                      item.href === '/cards'
+                        ? 'menu-cards-link'
+                        : item.href === '/impact'
+                          ? 'menu-impact-link'
+                          : undefined
+                    }
                     className="ny-card flex items-center gap-3 !p-3"
                     aria-label={`${item.label} sayfasını aç`}
                   >
