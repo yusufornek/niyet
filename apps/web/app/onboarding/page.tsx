@@ -8,6 +8,7 @@ import { PhoneShell } from '@/components/phone-shell';
 export default function OnboardingPage() {
   const router = useRouter();
   const [i, setI] = useState(0);
+  const demoVideoUrl = process.env.NEXT_PUBLIC_DEMO_VIDEO_URL;
   const slides = [
     {
       eyebrow: 'Niyet',
@@ -72,6 +73,16 @@ export default function OnboardingPage() {
             onClick={() => router.push('/login')}
           >
             Demo modunda dene
+          </button>
+          <button
+            className="ny-pill w-full bg-white text-black hover:bg-white/90"
+            onClick={() => {
+              if (demoVideoUrl) {
+                window.open(demoVideoUrl, '_blank', 'noopener,noreferrer');
+              }
+            }}
+          >
+            Jüriler için demo videosu
           </button>
           <p className="pt-1 text-center text-[11px] text-white/40">Yatırım tavsiyesi içermez.</p>
         </div>
