@@ -29,7 +29,7 @@ import {
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
 
@@ -187,36 +187,79 @@ const SECTIONS: MenuSection[] = [
 ];
 
 export default function MenuPage() {
+  const [query, setQuery] = useState('');
+
+  // Substring filter (case + accent insensitive)
+  const filteredSections = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return SECTIONS;
+    return SECTIONS.map((s) => ({
+      ...s,
+      items: s.items.filter(
+        (it) =>
+          it.label.toLocaleLowerCase('tr-TR').includes(q) ||
+          it.desc.toLocaleLowerCase('tr-TR').includes(q),
+      ),
+    })).filter((s) => s.items.length > 0);
+  }, [query]);
+
+  const totalMatches = filteredSections.reduce((sum, s) => sum + s.items.length, 0);
+
   return (
     <PhoneShell title="Menü">
-      <p className="ny-tagline mb-4">Tüm sayfa ve özelliklere buradan ulaş.</p>
+      <p className="ny-tagline mb-3">Tüm sayfa ve özelliklere buradan ulaş.</p>
 
-      <div className="space-y-5">
-        {SECTIONS.map((section) => (
-          <section key={section.title}>
-            <div className="ny-eyebrow mb-2">{section.title}</div>
-            <div className="space-y-2">
-              {section.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href as `/${string}`}
-                  className="ny-card flex items-center gap-3 !p-3"
-                  aria-label={`${item.label} sayfasını aç`}
-                >
-                  <span className="text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--divider-soft))]">
-                    {item.icon}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold leading-tight">{item.label}</div>
-                    <div className="mt-0.5 text-[11px] opacity-60">{item.desc}</div>
-                  </div>
-                  <span className="text-base opacity-30">›</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ))}
+      {/* Arama barı — uiverse.io plastic-parrot stili */}
+      <div className="mb-4">
+        <input
+          className="w-full rounded-full bg-zinc-200 px-4 py-2 font-mono text-zinc-700 shadow-md outline-none ring-1 ring-zinc-400 duration-300 placeholder:text-zinc-600 placeholder:opacity-50 focus:shadow-lg focus:shadow-rose-400/40 focus:ring-2 focus:ring-rose-400"
+          autoComplete="off"
+          placeholder="Menüde ara..."
+          name="menu-search"
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Menüde sayfa ara"
+        />
+        {query.trim() && (
+          <div className="mt-2 px-1 text-xs opacity-60">
+            {totalMatches > 0 ? `${totalMatches} sonuç` : 'Eşleşme yok'}
+          </div>
+        )}
       </div>
+
+      {filteredSections.length === 0 ? (
+        <div className="ny-card !p-6 text-center text-sm opacity-60">
+          Aradığın sayfa bulunamadı. Farklı bir kelime dene.
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {filteredSections.map((section) => (
+            <section key={section.title}>
+              <div className="ny-eyebrow mb-2">{section.title}</div>
+              <div className="space-y-2">
+                {section.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href as `/${string}`}
+                    className="ny-card flex items-center gap-3 !p-3"
+                    aria-label={`${item.label} sayfasını aç`}
+                  >
+                    <span className="text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--divider-soft))]">
+                      {item.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold leading-tight">{item.label}</div>
+                      <div className="mt-0.5 text-[11px] opacity-60">{item.desc}</div>
+                    </div>
+                    <span className="text-base opacity-30">›</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
 
       <p className="mt-6 text-center text-[10px] opacity-40">
         Tab bardaki ✶ Ana / Birikim / Asistan ve <CreditCard size={10} className="inline" />{' '}
