@@ -1,0 +1,139 @@
+/**
+ * Flip Card — banka/kredi kartı görseli, hover ile arka yüze döner.
+ * Orijinal: uiverse.io/Praashoo7 — Niyet renk ve içeriği ile adapte.
+ *
+ * Container 240x154px; perspective 3D dönüşüm için.
+ */
+.flip-card {
+  background-color: transparent;
+  width: 240px;
+  height: 154px;
+  perspective: 1000px;
+  color: #fff;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.8s;
+  transform-style: preserve-3d;
+}
+
+.flip-card:hover .flip-card-inner,
+.flip-card:focus-within .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 1rem;
+  box-shadow:
+    rgba(0, 0, 0, 0.4) 0 2px 2px,
+    rgba(0, 0, 0, 0.3) 0 7px 13px -3px,
+    rgba(0, 0, 0, 0.2) 0 -1px 0 inset;
+}
+
+.flip-card-front {
+  background: linear-gradient(135deg, #0066cc 0%, #003a75 100%);
+  padding: 16px;
+  text-align: left;
+  justify-content: space-between;
+}
+
+.flip-card-back {
+  background: #171717;
+  transform: rotateY(180deg);
+  padding: 12px;
+}
+
+/* Ön yüz */
+.flip-card-front .brand {
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.flip-card-front .chip {
+  width: 32px;
+  height: 24px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #f1c40f 0%, #d4a017 100%);
+  position: relative;
+}
+
+.flip-card-front .chip::before,
+.flip-card-front .chip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.flip-card-front .number {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+.flip-card-front .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.flip-card-front .row .label {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.flip-card-front .row .value {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Arka yüz */
+.flip-card-back .strip {
+  background: repeating-linear-gradient(45deg, #303030, #303030 10px, #202020 10px, #202020 20px);
+  width: 100%;
+  height: 28px;
+  margin-top: 14px;
+}
+
+.flip-card-back .sig {
+  background: #fff;
+  height: 22px;
+  margin-top: 16px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 8px;
+  color: #000;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.3em;
+}
+
+.flip-card-back .note {
+  margin-top: 12px;
+  font-size: 9px;
+  opacity: 0.5;
+  text-align: center;
+  line-height: 1.4;
+}

@@ -16,6 +16,7 @@ import { Suspense, useState } from 'react';
 import { GoalsContent } from '@/components/goals-content';
 import { PhoneShell } from '@/components/phone-shell';
 import { RadarContent } from '@/components/radar-content';
+import { Spinner } from '@/components/spinner';
 
 type SavingsTab = 'radar' | 'goals';
 
@@ -24,7 +25,9 @@ export default function SavingsPage() {
     <Suspense
       fallback={
         <PhoneShell title="Birikim">
-          <div className="ny-card h-32 animate-pulse" />
+          <div className="flex h-64 items-center justify-center">
+            <Spinner label="Yükleniyor" />
+          </div>
         </PhoneShell>
       }
     >

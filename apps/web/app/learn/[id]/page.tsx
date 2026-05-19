@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { CheckCircle2, Flame, Sparkles } from 'lucide-react';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { Spinner } from '@/components/spinner';
 import { useCompleteLearnCard, useLearnCard } from '@/lib/graphql/queries';
 
 export default function LearnCardPage() {
@@ -31,9 +32,8 @@ export default function LearnCardPage() {
   return (
     <PhoneShell title="Kart Detayı" back>
       {isLoading ? (
-        <div className="space-y-3">
-          <div className="ny-card h-24 animate-pulse" />
-          <div className="ny-card h-56 animate-pulse" />
+        <div className="flex h-64 items-center justify-center">
+          <Spinner label="Yükleniyor" />
         </div>
       ) : !card ? (
         <div className="ny-card space-y-2 text-sm">

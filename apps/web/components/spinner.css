@@ -1,0 +1,38 @@
+/**
+ * Niyet Spinner — uiverse.io barisdogansutcu dash4 pattern.
+ * Renk: Niyet primary mavisi (--primary HSL token'ı).
+ */
+.niyet-spinner {
+  transform-origin: center;
+  animation: niyet-spin-rotate 2s linear infinite;
+}
+
+.niyet-spinner circle {
+  fill: none;
+  stroke: hsl(var(--primary));
+  stroke-width: 2;
+  stroke-dasharray: 1, 200;
+  stroke-dashoffset: 0;
+  stroke-linecap: round;
+  animation: niyet-spin-dash 1.5s ease-in-out infinite;
+}
+
+@keyframes niyet-spin-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes niyet-spin-dash {
+  0% {
+    stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 200;
+    stroke-dashoffset: -35px;
+  }
+  100% {
+    stroke-dashoffset: -125px;
+  }
+}

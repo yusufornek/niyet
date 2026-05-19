@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { Spinner } from '@/components/spinner';
 import {
   useAnalysisRun,
   useEditTransactionCategory,
@@ -41,7 +42,9 @@ export default function AnalysisDetailPage() {
   if (isLoading) {
     return (
       <PhoneShell title="Analiz detayı" back>
-        <div className="ny-card h-40 animate-pulse" />
+        <div className="flex h-64 items-center justify-center">
+          <Spinner label="Yükleniyor" />
+        </div>
       </PhoneShell>
     );
   }

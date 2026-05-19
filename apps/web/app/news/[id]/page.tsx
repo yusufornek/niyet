@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { Spinner } from '@/components/spinner';
 import { useFinanceNewsItem } from '@/lib/graphql/queries';
 
 export default function NewsDetailPage() {
@@ -16,9 +17,8 @@ export default function NewsDetailPage() {
   return (
     <PhoneShell title="Haber Detayı" back>
       {isLoading ? (
-        <div className="space-y-3">
-          <div className="ny-card h-28 animate-pulse" />
-          <div className="ny-card h-40 animate-pulse" />
+        <div className="flex h-64 items-center justify-center">
+          <Spinner label="Yükleniyor" />
         </div>
       ) : !item ? (
         <div className="ny-card text-center">

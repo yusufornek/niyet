@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 
 import { GoalProgressTimeline } from '@/components/goal-progress-timeline';
 import { PhoneShell } from '@/components/phone-shell';
+import { Spinner } from '@/components/spinner';
 import {
   type GoalPlanLevel,
   useGoal,
@@ -55,7 +56,9 @@ export default function GoalDetailPage() {
   if (isLoading) {
     return (
       <PhoneShell title="Hedef" back>
-        <div className="ny-card h-32 animate-pulse" />
+        <div className="flex h-64 items-center justify-center">
+          <Spinner label="Yükleniyor" />
+        </div>
       </PhoneShell>
     );
   }

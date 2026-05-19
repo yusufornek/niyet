@@ -148,10 +148,16 @@ const SECTIONS: MenuSection[] = [
         desc: 'Tüm bildirim geçmişi',
       },
       {
+        href: '/cards',
+        label: 'Bağlı Kartlarım',
+        icon: <CreditCard size={18} />,
+        desc: 'Tasarrufun otomatik kesildiği kartlar',
+      },
+      {
         href: '/connect',
-        label: 'Banka & Kart',
+        label: 'Banka & Kart Yönet',
         icon: <Building2 size={18} />,
-        desc: 'Hesap bağlantıları',
+        desc: 'Yeni bağlantı / kaldırma',
       },
       {
         href: '/pause',
@@ -212,7 +218,7 @@ export default function MenuPage() {
       {/* Arama barı — uiverse.io plastic-parrot stili */}
       <div className="mb-4">
         <input
-          className="w-full rounded-full bg-zinc-200 px-4 py-2 font-mono text-zinc-700 shadow-md outline-none ring-1 ring-zinc-400 duration-300 placeholder:text-zinc-600 placeholder:opacity-50 focus:shadow-lg focus:shadow-rose-400/40 focus:ring-2 focus:ring-rose-400"
+          className="w-full rounded-full bg-white px-4 py-2 font-mono text-zinc-800 shadow-md outline-none ring-1 ring-zinc-300 duration-300 placeholder:text-zinc-400 placeholder:opacity-80 focus:shadow-lg focus:shadow-[hsl(var(--primary)/0.35)] focus:ring-2 focus:ring-[hsl(var(--primary))]"
           autoComplete="off"
           placeholder="Menüde ara..."
           name="menu-search"

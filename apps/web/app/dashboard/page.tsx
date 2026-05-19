@@ -29,6 +29,7 @@ import { FinancialSnapshotCard } from '@/components/financial-snapshot-card';
 import { MonthlyTargetWidget } from '@/components/monthly-target-widget';
 import { PhoneShell } from '@/components/phone-shell';
 import { ScoreCard } from '@/components/score-card';
+import { Spinner } from '@/components/spinner';
 import {
   useDashboard,
   useFutureScoreInsights,
@@ -66,10 +67,15 @@ export default function DashboardPage() {
     >
       <div className="pb-4 pt-2">
         <div className="ny-eyebrow">Merhaba {userName || 'Niyetli'}</div>
-        <h1 className="ny-h1 mt-1">
-          {dashLoading
-            ? 'Yükleniyor…'
-            : `Bu ay ${formatTRY(dashboard?.totalOpportunityLast30d ?? 0)} kurtarabilirsin.`}
+        <h1 className="ny-h1 mt-1 flex items-center gap-2">
+          {dashLoading ? (
+            <>
+              <Spinner size={28} />
+              <span className="opacity-60">Yükleniyor…</span>
+            </>
+          ) : (
+            `Bu ay ${formatTRY(dashboard?.totalOpportunityLast30d ?? 0)} kurtarabilirsin.`
+          )}
         </h1>
       </div>
 

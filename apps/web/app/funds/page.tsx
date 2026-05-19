@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useState } from 'react';
 
 import { PhoneShell } from '@/components/phone-shell';
+import { Spinner } from '@/components/spinner';
 import { type RiskProfile, useFundRecommendations, useGoals } from '@/lib/graphql/queries';
 
 export default function FundsPage() {
@@ -12,7 +13,9 @@ export default function FundsPage() {
     <Suspense
       fallback={
         <PhoneShell title="Fon Önerileri">
-          <div className="ny-card h-32 animate-pulse" />
+          <div className="flex h-64 items-center justify-center">
+            <Spinner label="Yükleniyor" />
+          </div>
         </PhoneShell>
       }
     >
